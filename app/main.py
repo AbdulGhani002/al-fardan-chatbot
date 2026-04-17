@@ -85,8 +85,15 @@ _CATEGORY_ACTIONS: dict[str, list[dict]] = {
 
 
 def _actions_for_entry(entry: KbEntry) -> list[ChatAction]:
-    """Explicit entry-level actions override category defaults."""
-    raw = entry.actions or _CATEGORY_ACTIONS.get(entry.category, [])
+    """Explicit entry-level actions override category defaults.
+
+    Uses getattr with a default so entries unpickled from an older
+    schema (pre-`actions` field) don't crash — they just fall through
+    to the category-default action set.
+    """
+    explicit = getattr(entry, "actions", None) or []
+    category = getattr(entry, "category", "") or ""
+    raw = explicit or _CATEGORY_ACTIONS.get(category, [])
     return [
         ChatAction(
             label=a["label"],
@@ -136,10 +143,27 @@ def _load_retriever() -> TfidfRetriever:
     First-boot + after an admin edit we fall through to the in-memory
     build. This keeps dev friction low — no separate `build_index`
     step required unless you want to skip the cold-start work.
+
+    Schema-drift guard: if a pickle is from an older schema (e.g.
+    missing the newer `actions` field on KbEntry) we detect it by
+    sampling one entry and rebuild from source. This prevents the
+    new code from silently loading stale pickles and crashing on
+    attribute access downstream.
     """
     if settings.index_path.exists():
         try:
-            return TfidfRetriever.load(settings.index_path)
+            r = TfidfRetriever.load(settings.index_path)
+            # Sample one entry — if the schema drifted (e.g. missing
+            # attribute added in a later release), trigger a rebuild.
+            if r.entries:
+                sample = r.entries[0]
+                if not hasattr(sample, "actions"):
+                    print(
+                        "[main] pickled index predates `actions` field — "
+                        "rebuilding from KB source"
+                    )
+                    return build_retriever_from_kb(settings.kb_dir)
+            return r
         except Exception as err:  # noqa: BLE001
             print(f"[main] failed to load prebuilt index ({err}); rebuilding")
     return build_retriever_from_kb(settings.kb_dir)
