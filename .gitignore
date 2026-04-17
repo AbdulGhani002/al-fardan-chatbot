@@ -5,7 +5,10 @@ __pycache__/
 .env
 app/data/index.pkl
 app/data/chat.db
-app/data/kb/scraped_*.jsonl
+# Scraped KB files ARE committed — they represent a specific scrape
+# snapshot and we want the VPS build to ship identical content without
+# needing outbound HTTPS to ethereum.org / bitcoin.org / wikipedia
+# during container rebuild. Re-run scrapers locally when refreshing.
 .pytest_cache/
 dist/
 build/

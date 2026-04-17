@@ -39,6 +39,7 @@ from .retrieval.tfidf import (
     TfidfRetriever,
     build_retriever_from_kb,
 )
+from .retrieval import dense as dense_retrieval
 
 
 # ─── Category → default action mapping ────────────────────────────────
@@ -133,40 +134,86 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-Chatbot-Secret"],
 )
 
-_retriever: Optional[TfidfRetriever] = None
+# The retriever can be either a DenseRetriever (preferred, semantic) or
+# a TfidfRetriever (fallback). Both expose the same public surface
+# (size, vocab_size, search, entries) so call sites are retriever-agnostic.
+_retriever: Optional[object] = None
+_retriever_kind: str = "none"  # "dense" | "tfidf" | "none" — for /health
 _start_time = time.time()
 
 
-def _load_retriever() -> TfidfRetriever:
-    """Load the prebuilt pickle if present, otherwise build from KB.
+def _load_retriever() -> object:
+    """Preference order for producing a ready-to-serve retriever:
 
-    First-boot + after an admin edit we fall through to the in-memory
-    build. This keeps dev friction low — no separate `build_index`
-    step required unless you want to skip the cold-start work.
+    1. If a prebuilt pickle exists and declares itself 'dense', load it.
+       Dense pickles are O(100ms) to mmap and serve.
+    2. If fastembed is available, build a fresh dense retriever from the
+       KB dir. First boot downloads the embedding model (~130MB); every
+       subsequent boot uses the cached model.
+    3. Fall back to TF-IDF — either loading a legacy pickle or building
+       from KB. The bot stays functional if fastembed/onnxruntime is
+       somehow broken (missing lib, OOM, etc.).
 
-    Schema-drift guard: if a pickle is from an older schema (e.g.
-    missing the newer `actions` field on KbEntry) we detect it by
-    sampling one entry and rebuild from source. This prevents the
-    new code from silently loading stale pickles and crashing on
-    attribute access downstream.
+    Every transition logs clearly so ops can see which tier is serving
+    traffic at any given time.
     """
+    global _retriever_kind
+
+    # ─── Try dense pickle load ────────────────────────────────────
+    if settings.index_path.exists() and dense_retrieval.available():
+        try:
+            r = dense_retrieval.DenseRetriever.load(settings.index_path)
+            print(
+                f"[main] dense retriever loaded from pickle "
+                f"({r.size} entries, dim={r.vocab_size})"
+            )
+            _retriever_kind = "dense"
+            return r
+        except Exception as err:  # noqa: BLE001
+            # Could be: pickle is a TF-IDF variant, pickle corrupted, or
+            # schema drifted. Fall through to next strategy.
+            print(f"[main] dense pickle load failed ({err}); trying next")
+
+    # ─── Build fresh dense retriever from KB ──────────────────────
+    if dense_retrieval.available():
+        try:
+            print("[main] building dense retriever from KB (first boot)...")
+            r = dense_retrieval.build_dense_from_kb(settings.kb_dir)
+            # Cache for next boot — saves ~seconds on cold-start once models
+            # are downloaded but KB re-embedding still takes time.
+            try:
+                r.save(settings.index_path)
+            except Exception as err:  # noqa: BLE001
+                print(f"[main] could not save dense pickle ({err}); in-memory only")
+            print(
+                f"[main] dense retriever built "
+                f"({r.size} entries, dim={r.vocab_size})"
+            )
+            _retriever_kind = "dense"
+            return r
+        except Exception as err:  # noqa: BLE001
+            print(f"[main] dense build failed ({err}); falling back to TF-IDF")
+    else:
+        print(
+            f"[main] fastembed unavailable — using TF-IDF fallback. "
+            f"Reason: {dense_retrieval.unavailable_reason()}"
+        )
+
+    # ─── Fall back to TF-IDF ──────────────────────────────────────
     if settings.index_path.exists():
         try:
             r = TfidfRetriever.load(settings.index_path)
-            # Sample one entry — if the schema drifted (e.g. missing
-            # attribute added in a later release), trigger a rebuild.
-            if r.entries:
-                sample = r.entries[0]
-                if not hasattr(sample, "actions"):
-                    print(
-                        "[main] pickled index predates `actions` field — "
-                        "rebuilding from KB source"
-                    )
-                    return build_retriever_from_kb(settings.kb_dir)
+            if r.entries and not hasattr(r.entries[0], "actions"):
+                print("[main] TF-IDF pickle predates `actions` — rebuilding")
+                r = build_retriever_from_kb(settings.kb_dir)
+            _retriever_kind = "tfidf"
             return r
         except Exception as err:  # noqa: BLE001
-            print(f"[main] failed to load prebuilt index ({err}); rebuilding")
-    return build_retriever_from_kb(settings.kb_dir)
+            print(f"[main] TF-IDF pickle load failed ({err}); rebuilding from KB")
+
+    r = build_retriever_from_kb(settings.kb_dir)
+    _retriever_kind = "tfidf"
+    return r
 
 
 @app.on_event("startup")
@@ -175,8 +222,10 @@ async def _on_startup() -> None:
     ensure_db(settings.db_path)
     _retriever = _load_retriever()
     print(
-        f"[main] retriever ready — {_retriever.size} entries, "
-        f"{_retriever.vocab_size} tokens"
+        f"[main] retriever ready — kind={_retriever_kind}, "
+        f"{_retriever.size} entries, "  # type: ignore[attr-defined]
+        f"{_retriever.vocab_size} "  # type: ignore[attr-defined]
+        f"{'dims' if _retriever_kind == 'dense' else 'tokens'}"
     )
 
 
@@ -188,7 +237,9 @@ def require_admin_secret(
         raise HTTPException(status_code=401, detail="invalid secret")
 
 
-def retriever() -> TfidfRetriever:
+def retriever() -> object:
+    """Retriever dependency — duck-typed (dense or TF-IDF). Both
+    expose .search(query, top_k) returning list[SearchResult]."""
     if _retriever is None:
         raise HTTPException(status_code=503, detail="retriever not loaded")
     return _retriever
@@ -196,22 +247,114 @@ def retriever() -> TfidfRetriever:
 
 # ─── Routes ───────────────────────────────────────────────────────────
 
+# Per-retriever confidence threshold. Dense cosine sims live in a very
+# different range than TF-IDF TF-IDF cosine — same 0.15 threshold would
+# make dense answer anything faintly related. Tune separately.
+_CONFIDENCE_BY_KIND = {
+    "dense": 0.50,   # bge-small returns 0.55-0.90 for good matches
+    "tfidf": 0.15,   # legacy setting — bag-of-words cosine is tighter
+}
+
+
+def _confidence_threshold() -> float:
+    """Kind-aware threshold — fallback to the config default if the
+    retriever kind is unrecognised (shouldn't happen in practice)."""
+    return _CONFIDENCE_BY_KIND.get(
+        _retriever_kind, settings.confidence_threshold
+    )
+
+
+# ─── Lightweight response cache ──────────────────────────────────────
+# Embedding + retrieval for a freshly-typed query is ~10-15ms with
+# bge-small. That's fast, but we still see the same popular questions
+# asked many times ("tell me about al fardan", "what is LTV"). Caching
+# the {retriever_kind, normalised_query} → ChatResponse tuple turns
+# the 2nd+ hit into a sub-ms dict lookup — meaningful savings under
+# load, and it caps model CPU usage.
+#
+# Why a TTL? KB reindexes (via /admin/reindex) should invalidate the
+# cache. Simple TTL eviction achieves that without wiring explicit
+# invalidation hooks into every admin path.
+
+from collections import OrderedDict
+import threading
+
+_CACHE_MAX_ENTRIES = 1000
+_CACHE_TTL_SECONDS = 3600  # 1 hour
+_response_cache: "OrderedDict[str, tuple[float, dict]]" = OrderedDict()
+_cache_lock = threading.Lock()
+
+
+def _cache_key(query: str) -> str:
+    """Normalise queries so minor typography variations share entries."""
+    return f"{_retriever_kind}|{' '.join(query.lower().split())}"
+
+
+def _cache_get(query: str) -> dict | None:
+    key = _cache_key(query)
+    now = time.time()
+    with _cache_lock:
+        hit = _response_cache.get(key)
+        if hit is None:
+            return None
+        cached_at, payload = hit
+        if now - cached_at > _CACHE_TTL_SECONDS:
+            _response_cache.pop(key, None)
+            return None
+        # LRU bump
+        _response_cache.move_to_end(key)
+        return payload
+
+
+def _cache_put(query: str, payload: dict) -> None:
+    key = _cache_key(query)
+    with _cache_lock:
+        _response_cache[key] = (time.time(), payload)
+        _response_cache.move_to_end(key)
+        while len(_response_cache) > _CACHE_MAX_ENTRIES:
+            _response_cache.popitem(last=False)
+
+
+def _cache_invalidate_all() -> None:
+    with _cache_lock:
+        _response_cache.clear()
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     r = _retriever
     return HealthResponse(
         ok=True,
         index_loaded=r is not None,
-        entries=r.size if r else 0,
+        entries=r.size if r else 0,  # type: ignore[attr-defined]
         uptime_seconds=time.time() - _start_time,
     )
+
+
+@app.get("/debug")
+async def debug_info() -> dict:
+    """Ops-friendly introspection — which retriever tier is live, how
+    hot the cache is, whether fastembed imported cleanly. Handy when
+    diagnosing a slow or stale chatbot without pulling container logs."""
+    r = _retriever
+    return {
+        "retriever_kind": _retriever_kind,
+        "entries": r.size if r else 0,  # type: ignore[attr-defined]
+        "dim_or_vocab": r.vocab_size if r else 0,  # type: ignore[attr-defined]
+        "confidence_threshold": _confidence_threshold(),
+        "fastembed_available": dense_retrieval.available(),
+        "fastembed_error": dense_retrieval.unavailable_reason() or None,
+        "cache_entries": len(_response_cache),
+        "cache_max": _CACHE_MAX_ENTRIES,
+        "uptime_seconds": time.time() - _start_time,
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(
     req: ChatRequest,
     request: Request,
-    r: TfidfRetriever = Depends(retriever),
+    r=Depends(retriever),
 ) -> ChatResponse:
     """Main chat endpoint — public (widget calls it directly)."""
     # Record user message first so we have context even if the reply fails
@@ -223,6 +366,26 @@ async def chat(
         user_id=req.user_id,
         user_email=req.user_email,
     )
+
+    # ─── Response cache ──────────────────────────────────────────
+    # Skip recording-cache logic for super-short messages (likely noise
+    # or greetings handled by intent); cache only substantive queries.
+    cached = _cache_get(req.message) if len(req.message) >= 3 else None
+    if cached is not None:
+        # Inject the caller's session token so history stays consistent
+        # while everything else (reply + actions + match metadata) is
+        # served from cache.
+        cached_reply = ChatResponse(**{**cached, "session_token": req.session_token})
+        record_message(
+            settings.db_path,
+            session_token=req.session_token,
+            role="bot",
+            text=cached_reply.reply,
+            match_type=cached_reply.match_type,
+            matched_entry=cached_reply.matched_entry_id,
+            match_score=cached_reply.match_score,
+        )
+        return cached_reply
 
     intent = classify(req.message)
 
@@ -250,10 +413,11 @@ async def chat(
         )
         return reply
 
-    # Fall through to TF-IDF retrieval
+    # Fall through to semantic retrieval (dense) or TF-IDF (fallback)
     hits = r.search(req.message, top_k=settings.top_k)
+    threshold = _confidence_threshold()
 
-    if not hits or hits[0].score < settings.confidence_threshold:
+    if not hits or hits[0].score < threshold:
         best_score = hits[0].score if hits else 0.0
         nearest = hits[0].entry.id if hits else None
         capture_unanswered(
@@ -307,6 +471,13 @@ async def chat(
         session_token=req.session_token,
         actions=entry_actions or None,
     )
+    # Cache the confident answer — subsequent identical queries are
+    # served from memory in sub-ms rather than re-embedding.
+    if len(req.message) >= 3:
+        _cache_put(
+            req.message,
+            response.model_dump(exclude={"session_token"}),
+        )
     record_message(
         settings.db_path,
         session_token=req.session_token,
@@ -328,15 +499,33 @@ async def chat_history(session_token: str, limit: int = 50):
 
 @app.post("/admin/reindex", response_model=ReindexResponse)
 async def admin_reindex(_: None = Depends(require_admin_secret)) -> ReindexResponse:
-    """Rebuild the TF-IDF index — call after editing the KB."""
-    global _retriever
+    """Rebuild the index — call after editing the KB.
+
+    Prefers the dense retriever if fastembed is available; falls back
+    to TF-IDF. Clears the response cache since answers may have changed.
+    """
+    global _retriever, _retriever_kind
     t0 = time.time()
-    _retriever = build_retriever_from_kb(settings.kb_dir)
-    _retriever.save(settings.index_path)
+    if dense_retrieval.available():
+        try:
+            _retriever = dense_retrieval.build_dense_from_kb(settings.kb_dir)
+            _retriever_kind = "dense"
+        except Exception as err:  # noqa: BLE001
+            print(f"[reindex] dense rebuild failed ({err}); falling back to TF-IDF")
+            _retriever = build_retriever_from_kb(settings.kb_dir)
+            _retriever_kind = "tfidf"
+    else:
+        _retriever = build_retriever_from_kb(settings.kb_dir)
+        _retriever_kind = "tfidf"
+    try:
+        _retriever.save(settings.index_path)  # type: ignore[attr-defined]
+    except Exception as err:  # noqa: BLE001
+        print(f"[reindex] save failed ({err}); in-memory only")
+    _cache_invalidate_all()
     return ReindexResponse(
         built=True,
-        entries=_retriever.size,
-        vocab_size=_retriever.vocab_size,
+        entries=_retriever.size,  # type: ignore[attr-defined]
+        vocab_size=_retriever.vocab_size,  # type: ignore[attr-defined]
         took_ms=int((time.time() - t0) * 1000),
     )
 

@@ -11,3 +11,11 @@ slowapi==0.1.9
 email-validator==2.2.0
 pytest==8.3.4
 pytest-asyncio==0.24.0
+
+# Semantic retrieval — ONNX-compiled sentence-transformers.
+# fastembed ships BAAI/bge-small-en-v1.5 as ONNX (~130MB) and runs on CPU
+# at ~10ms/query. No torch/cuda dependency — keeps container lean
+# (~500MB total vs 2GB+ with sentence-transformers/pytorch).
+# If fastembed fails to download or load at runtime, the code falls back
+# gracefully to the TF-IDF retriever so the bot keeps working.
+fastembed==0.4.2
