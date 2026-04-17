@@ -39,7 +39,11 @@ class Settings(BaseSettings):
     # Messages with a cosine similarity below this threshold are
     # treated as "the bot doesn't know" and get captured as an
     # unanswered query.
-    confidence_threshold: float = 0.22
+    # Lowered from 0.22 after QA found that typos + phrasing variants
+    # (e.g. "lonas" for loans, "how much can i get") scored in the
+    # 0.15-0.22 band — 0.15 catches the tail without polluting with
+    # unrelated matches.
+    confidence_threshold: float = 0.15
     top_k: int = 3
 
     # Data paths

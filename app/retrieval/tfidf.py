@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import pickle
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
@@ -39,9 +39,24 @@ class KbEntry:
     answer: str
     aliases: list[str]
     keywords: list[str]
+    # Optional: explicit list of interactive affordances to return with
+    # this answer. If empty, main.py auto-derives a default action from
+    # the category (staking → /staking, lending → /lending, etc.).
+    actions: list[dict] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict) -> "KbEntry":
+        raw_actions = d.get("actions") or []
+        actions: list[dict] = []
+        for a in raw_actions:
+            if isinstance(a, dict) and a.get("label") and a.get("url"):
+                actions.append(
+                    {
+                        "label": str(a["label"]).strip(),
+                        "url": str(a["url"]).strip(),
+                        "kind": str(a.get("kind", "link")),
+                    }
+                )
         return cls(
             id=str(d["id"]),
             category=str(d.get("category", "general")).lower(),
@@ -49,6 +64,7 @@ class KbEntry:
             answer=str(d["answer"]).strip(),
             aliases=[str(a).strip() for a in d.get("aliases", []) if a],
             keywords=[str(k).strip().lower() for k in d.get("keywords", []) if k],
+            actions=actions,
         )
 
     def searchable_text(self) -> str:

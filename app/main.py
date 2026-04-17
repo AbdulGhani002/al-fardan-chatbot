@@ -20,6 +20,7 @@ from .db import (
 )
 from .integrations.crm import post_lead_to_crm
 from .models import (
+    ChatAction,
     ChatRequest,
     ChatResponse,
     HealthResponse,
@@ -27,11 +28,86 @@ from .models import (
     ReindexResponse,
     UnansweredQueryOut,
 )
-from .retrieval.intent import classify, scripted_reply
+from .retrieval.intent import (
+    classify,
+    match_type_for,
+    scripted_actions,
+    scripted_reply,
+)
 from .retrieval.tfidf import (
+    KbEntry,
     TfidfRetriever,
     build_retriever_from_kb,
 )
+
+
+# ─── Category → default action mapping ────────────────────────────────
+# When a KB hit has no explicit `actions`, we auto-derive a button based
+# on the entry's category so answers about staking get an [Open Staking]
+# button, answers about lending get [Open Lending], etc. This is what
+# makes the bot feel agent-ish even for entries we haven't manually
+# annotated with action buttons.
+
+_CATEGORY_ACTIONS: dict[str, list[dict]] = {
+    "staking": [
+        {"label": "Open Staking", "url": "/staking", "kind": "link"},
+    ],
+    "lending": [
+        {"label": "Open Lending", "url": "/lending", "kind": "link"},
+        {"label": "Loan Calculator", "url": "/lending#calculator", "kind": "link"},
+    ],
+    "custody": [
+        {"label": "Open Wallets", "url": "/wallets", "kind": "link"},
+    ],
+    "otc": [
+        {"label": "Open OTC Desk", "url": "/otc", "kind": "link"},
+    ],
+    "crm": [
+        # Auto-link for CRM nav answers depends on the question — leave
+        # the answer text to provide the specific URL; return a Portfolio
+        # button as a reasonable default fallback.
+        {"label": "Open Portfolio", "url": "/portfolio", "kind": "link"},
+    ],
+    "pricing": [
+        {"label": "Open Pricing Details", "url": "/pricing", "kind": "link"},
+    ],
+    "security": [
+        {"label": "Security Settings", "url": "/settings#security", "kind": "link"},
+    ],
+    "support": [
+        {"label": "Open Support", "url": "/settings?tab=support", "kind": "link"},
+    ],
+    "onboarding": [
+        {"label": "Start Signup", "url": "/auth/signup", "kind": "link"},
+    ],
+    # Crypto / bitcoin / general → no auto action (pure info)
+}
+
+
+def _actions_for_entry(entry: KbEntry) -> list[ChatAction]:
+    """Explicit entry-level actions override category defaults."""
+    raw = entry.actions or _CATEGORY_ACTIONS.get(entry.category, [])
+    return [
+        ChatAction(
+            label=a["label"],
+            url=a["url"],
+            kind=a.get("kind", "link"),
+        )
+        for a in raw
+    ]
+
+
+def _actions_from_list(raw: list[dict] | None) -> list[ChatAction] | None:
+    if not raw:
+        return None
+    return [
+        ChatAction(
+            label=a["label"],
+            url=a["url"],
+            kind=a.get("kind", "link"),
+        )
+        for a in raw
+    ]
 
 
 # ─── App bootstrap ─────────────────────────────────────────────────────
@@ -129,20 +205,17 @@ async def chat(
     # Scripted replies beat retrieval for well-defined intents
     scripted = scripted_reply(intent)
     if scripted is not None:
+        actions = _actions_from_list(scripted_actions(intent))
         reply = ChatResponse(
             reply=scripted,
-            match_type=(
-                "intent_signup" if intent == "signup"
-                else "intent_greeting" if intent == "greeting"
-                else "intent_goodbye" if intent == "goodbye"
-                else "kb_hit"
-            ),
+            match_type=match_type_for(intent),
             session_token=req.session_token,
             signup_fields_needed=(
                 ["firstName", "lastName", "email", "phone", "service"]
                 if intent == "signup"
                 else None
             ),
+            actions=actions,
         )
         record_message(
             settings.db_path,
@@ -171,14 +244,23 @@ async def chat(
         reply_text = (
             "I don't have a confident answer for that yet — I've logged your "
             "question for our team and a human will follow up. In the "
-            "meantime, is there something else I can help with?"
+            "meantime, here are some things I can help with."
         )
+        # Even on fallback, give the user quick-access buttons to the
+        # main service pages so the conversation has somewhere to go.
+        fallback_actions = [
+            ChatAction(label="Open Portfolio", url="/portfolio", kind="link"),
+            ChatAction(label="Open Staking", url="/staking", kind="link"),
+            ChatAction(label="Open Lending", url="/lending", kind="link"),
+            ChatAction(label="Contact Support", url="/settings?tab=support", kind="link"),
+        ]
         response = ChatResponse(
             reply=reply_text,
             match_type="low_confidence" if hits else "fallback",
             matched_entry_id=nearest,
             match_score=best_score,
             session_token=req.session_token,
+            actions=fallback_actions,
         )
         record_message(
             settings.db_path,
@@ -192,12 +274,14 @@ async def chat(
         return response
 
     top = hits[0]
+    entry_actions = _actions_for_entry(top.entry)
     response = ChatResponse(
         reply=top.entry.answer,
         match_type="kb_hit",
         matched_entry_id=top.entry.id,
         match_score=top.score,
         session_token=req.session_token,
+        actions=entry_actions or None,
     )
     record_message(
         settings.db_path,

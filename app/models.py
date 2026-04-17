@@ -37,8 +37,32 @@ MatchType = Literal[
     "intent_signup",
     "intent_greeting",
     "intent_goodbye",
+    "intent_navigate_staking",
+    "intent_navigate_lending",
+    "intent_navigate_custody",
+    "intent_navigate_otc",
+    "intent_navigate_portfolio",
+    "intent_navigate_settings",
+    "intent_navigate_wallets",
+    "intent_balance",
+    "intent_contact_support",
+    "intent_withdraw",
+    "intent_deposit",
     "system_error",
 ]
+
+
+class ChatAction(BaseModel):
+    """A tappable button the widget renders below a bot message.
+
+    kind="link"    → widget navigates the parent page to `url`
+    kind="prefill" → widget pre-fills the chat input with `url` as a
+                     follow-up message (for multi-turn flows)
+    """
+
+    label: str = Field(..., min_length=1, max_length=60)
+    url: str = Field(..., min_length=1, max_length=200)
+    kind: Literal["link", "prefill"] = "link"
 
 
 class ChatResponse(BaseModel):
@@ -51,6 +75,10 @@ class ChatResponse(BaseModel):
     # When match_type == intent_signup, the bot returns a form
     # scaffold so the widget can render collection fields inline.
     signup_fields_needed: Optional[list[str]] = None
+    # Interactive affordances — the widget renders these as buttons
+    # below the bot message. Used to deep-link users directly to the
+    # right CRM page (or kick off a follow-up multi-turn flow).
+    actions: Optional[list[ChatAction]] = None
     # Session id for the client to persist so future messages stay
     # threaded with this conversation.
     session_token: str
