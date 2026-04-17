@@ -181,3 +181,120 @@ def update_query_status(
             (status, review_notes, qid),
         )
         return cur.rowcount > 0
+
+
+# ─── Training data export ─────────────────────────────────────────────
+
+def list_all_messages(
+    db_path: Path,
+    since_iso: Optional[str] = None,
+    limit: int = 10_000,
+) -> list[dict]:
+    """Pull every chat message (paired user + bot turns) for training.
+
+    Ordered by session_token then id so each session's conversation
+    stays together in chronological order — ready to be converted into
+    fine-tuning pairs or used to identify KB gaps.
+    """
+    with connect(db_path) as conn:
+        if since_iso:
+            rows = conn.execute(
+                """SELECT id, session_token, role, text, match_type,
+                          matched_entry, match_score, user_id, user_email,
+                          created_at
+                   FROM chat_messages
+                   WHERE created_at >= ?
+                   ORDER BY session_token, id
+                   LIMIT ?""",
+                (since_iso, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT id, session_token, role, text, match_type,
+                          matched_entry, match_score, user_id, user_email,
+                          created_at
+                   FROM chat_messages
+                   ORDER BY session_token, id
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def training_turn_pairs(
+    db_path: Path, since_iso: Optional[str] = None, limit: int = 5000
+) -> list[dict]:
+    """Walk the message log and pair each 'user' turn with the
+    immediately-following 'bot' turn. Drops dangling turns.
+
+    Emits records shaped:
+        {
+          "user": "...",
+          "bot": "...",
+          "match_type": "kb_hit" | "low_confidence" | ...,
+          "matched_entry": "crm-001" | null,
+          "score": 0.84 | null,
+          "session_token": "...",
+          "created_at": "2026-04-17T..."
+        }
+
+    This is the format you'd hand to a curation workflow: look at
+    low_confidence turns, decide whether to add them to the KB, or
+    tune aliases on the existing `matched_entry`.
+    """
+    msgs = list_all_messages(db_path, since_iso=since_iso, limit=limit * 3)
+    pairs: list[dict] = []
+    # Iterate linearly; emit a pair whenever a user turn is followed
+    # directly by a bot turn within the same session.
+    for i in range(len(msgs) - 1):
+        a = msgs[i]
+        b = msgs[i + 1]
+        if (
+            a["role"] == "user"
+            and b["role"] == "bot"
+            and a["session_token"] == b["session_token"]
+        ):
+            pairs.append(
+                {
+                    "user": a["text"],
+                    "bot": b["text"],
+                    "match_type": b.get("match_type"),
+                    "matched_entry": b.get("matched_entry"),
+                    "score": b.get("match_score"),
+                    "session_token": a["session_token"],
+                    "created_at": a["created_at"],
+                }
+            )
+            if len(pairs) >= limit:
+                break
+    return pairs
+
+
+def message_stats(db_path: Path) -> dict:
+    """Quick summary counters — rendered in /admin/conversations/stats."""
+    with connect(db_path) as conn:
+        total = conn.execute("SELECT COUNT(*) c FROM chat_messages").fetchone()["c"]
+        user = conn.execute(
+            "SELECT COUNT(*) c FROM chat_messages WHERE role = 'user'"
+        ).fetchone()["c"]
+        bot = conn.execute(
+            "SELECT COUNT(*) c FROM chat_messages WHERE role = 'bot'"
+        ).fetchone()["c"]
+        sessions = conn.execute(
+            "SELECT COUNT(DISTINCT session_token) c FROM chat_messages"
+        ).fetchone()["c"]
+        unanswered = conn.execute(
+            "SELECT COUNT(*) c FROM unanswered_queries WHERE status = 'new'"
+        ).fetchone()["c"]
+        low_conf = conn.execute(
+            """SELECT COUNT(*) c FROM chat_messages
+               WHERE role = 'bot' AND match_type = 'low_confidence'"""
+        ).fetchone()["c"]
+    return {
+        "total_messages": total,
+        "user_messages": user,
+        "bot_messages": bot,
+        "unique_sessions": sessions,
+        "unanswered_queue_new": unanswered,
+        "low_confidence_bot_turns": low_conf,
+    }

@@ -200,8 +200,10 @@ def scripted_reply(intent: Intent) -> str | None:
     """
     if intent == "greeting":
         return (
-            "Assalamu alaikum — I'm Safiya. Happy to help you with Custody, "
-            "Staking, OTC, or Lending. What brings you here today?"
+            "Assalamu alaikum — I'm Safiya Al Suwaidi, Client Acquisition & "
+            "Growth Manager at Al-Fardan Q9. I help new investors get started "
+            "with our Custody, Staking, OTC, and Lending services. "
+            "What brings you here today?"
         )
     if intent == "goodbye":
         return (

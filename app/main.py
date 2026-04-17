@@ -14,8 +14,11 @@ from .db import (
     capture_unanswered,
     ensure_db,
     get_history,
+    list_all_messages,
     list_unanswered,
+    message_stats,
     record_message,
+    training_turn_pairs,
     update_query_status,
 )
 from .integrations.crm import post_lead_to_crm
@@ -671,3 +674,53 @@ async def admin_lead_handoff(
     """
     crm_response = await post_lead_to_crm(lead)
     return {"success": True, "crm": crm_response}
+
+
+# ─── Conversation storage + training export ───────────────────────────
+# Every user + bot message is already written to SQLite in chat.db
+# (/app/app/state/chat.db on the VPS, persisted across container
+# restarts via the chatbot-state volume). These endpoints surface that
+# data for training / KB curation work without exposing anything over
+# the public /chat route.
+
+@app.get("/admin/conversations/stats")
+async def admin_conversation_stats(
+    _: None = Depends(require_admin_secret),
+) -> dict:
+    """Quick numbers: how many messages, sessions, unanswered queries."""
+    return message_stats(settings.db_path)
+
+
+@app.get("/admin/conversations/export")
+async def admin_conversations_export(
+    since: Optional[str] = None,
+    limit: int = 10_000,
+    _: None = Depends(require_admin_secret),
+) -> dict:
+    """All chat messages since `since` (ISO datetime), ready for
+    offline training / analysis. Default limit 10k — raise via query
+    param if you need more.
+
+    Output shape: {count: N, messages: [...]} — each message has
+    role, text, matched_entry, score, session_token, created_at.
+    """
+    rows = list_all_messages(settings.db_path, since_iso=since, limit=limit)
+    return {"count": len(rows), "messages": rows}
+
+
+@app.get("/admin/conversations/pairs")
+async def admin_conversation_pairs(
+    since: Optional[str] = None,
+    limit: int = 5_000,
+    _: None = Depends(require_admin_secret),
+) -> dict:
+    """User+bot turn pairs — the format you'd hand to a curation
+    workflow. Each pair has the raw user question, the bot's reply,
+    the match type + score + matched KB entry.
+
+    Filter client-side on match_type='low_confidence' to find the
+    queries that need new KB entries, or match_type='kb_hit' with
+    low scores to find answers that should be tuned.
+    """
+    pairs = training_turn_pairs(settings.db_path, since_iso=since, limit=limit)
+    return {"count": len(pairs), "pairs": pairs}
