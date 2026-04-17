@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+app/data/index.pkl
+app/data/chat.db
+app/data/kb/scraped_*.jsonl
+.pytest_cache/
+dist/
+build/

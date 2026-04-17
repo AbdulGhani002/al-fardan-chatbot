@@ -1,0 +1,24 @@
+# Standalone compose for local dev.
+# For VPS deployment alongside Redis + mailcow, merge this service into
+# /root/al-fardan/docker-compose.yml (see scripts/vps-setup.sh in the CRM).
+services:
+  chatbot:
+    build: .
+    image: al-fardan-chatbot:latest
+    container_name: al-fardan-chatbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    volumes:
+      - chatbot-data:/app/app/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  chatbot-data:
+    driver: local
