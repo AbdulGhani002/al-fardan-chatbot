@@ -49,36 +49,36 @@ from .retrieval.tfidf import (
 # annotated with action buttons.
 
 _CATEGORY_ACTIONS: dict[str, list[dict]] = {
+    # Real CRM routes — every URL here MUST map to an existing page in
+    # al-fardan-crm/src/app/<path>/page.tsx. Wrong paths produce 404s
+    # in production because the widget navigates users to them directly.
     "staking": [
-        {"label": "Open Staking", "url": "/staking", "kind": "link"},
+        {"label": "Open Staking", "url": "/dashboard/staking", "kind": "link"},
     ],
     "lending": [
-        {"label": "Open Lending", "url": "/lending", "kind": "link"},
-        {"label": "Loan Calculator", "url": "/lending#calculator", "kind": "link"},
+        {"label": "Open Loans", "url": "/dashboard/loans", "kind": "link"},
+        {"label": "Lending Service", "url": "/dashboard/services/lending", "kind": "link"},
     ],
     "custody": [
-        {"label": "Open Wallets", "url": "/wallets", "kind": "link"},
+        {"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"},
     ],
     "otc": [
-        {"label": "Open OTC Desk", "url": "/otc", "kind": "link"},
+        {"label": "Open OTC Desk", "url": "/dashboard/services/otc", "kind": "link"},
     ],
     "crm": [
-        # Auto-link for CRM nav answers depends on the question — leave
-        # the answer text to provide the specific URL; return a Portfolio
-        # button as a reasonable default fallback.
-        {"label": "Open Portfolio", "url": "/portfolio", "kind": "link"},
+        {"label": "Open Dashboard", "url": "/dashboard", "kind": "link"},
     ],
     "pricing": [
-        {"label": "Open Pricing Details", "url": "/pricing", "kind": "link"},
+        {"label": "Open Dashboard", "url": "/dashboard", "kind": "link"},
     ],
     "security": [
-        {"label": "Security Settings", "url": "/settings#security", "kind": "link"},
+        {"label": "Security Settings", "url": "/dashboard/settings", "kind": "link"},
     ],
     "support": [
-        {"label": "Open Support", "url": "/settings?tab=support", "kind": "link"},
+        {"label": "Email Support", "url": "mailto:institutional@alfardanq9.com", "kind": "link"},
     ],
     "onboarding": [
-        {"label": "Start Signup", "url": "/auth/signup", "kind": "link"},
+        {"label": "Create Account", "url": "/auth/signup", "kind": "link"},
     ],
     # Crypto / bitcoin / general → no auto action (pure info)
 }
@@ -273,10 +273,10 @@ async def chat(
         # Even on fallback, give the user quick-access buttons to the
         # main service pages so the conversation has somewhere to go.
         fallback_actions = [
-            ChatAction(label="Open Portfolio", url="/portfolio", kind="link"),
-            ChatAction(label="Open Staking", url="/staking", kind="link"),
-            ChatAction(label="Open Lending", url="/lending", kind="link"),
-            ChatAction(label="Contact Support", url="/settings?tab=support", kind="link"),
+            ChatAction(label="Open Dashboard", url="/dashboard", kind="link"),
+            ChatAction(label="Open Staking", url="/dashboard/staking", kind="link"),
+            ChatAction(label="Open Loans", url="/dashboard/loans", kind="link"),
+            ChatAction(label="Email Support", url="mailto:institutional@alfardanq9.com", kind="link"),
         ]
         response = ChatResponse(
             reply=reply_text,

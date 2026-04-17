@@ -294,65 +294,62 @@ def scripted_actions(intent: Intent) -> list[dict] | None:
     These deep-link into the CRM's routes. The widget renders them as
     clickable chips beneath the bot's message.
     """
+    # URL map — these are the ACTUAL CRM routes. Keep this table as
+    # the single source of truth; do not invent new paths here without
+    # confirming the page exists at src/app/<path>/page.tsx in the CRM.
     if intent == "signup":
         return [
-            {"label": "Open Custody", "url": "/auth/signup?service=custody", "kind": "link"},
-            {"label": "Open Staking", "url": "/auth/signup?service=staking", "kind": "link"},
-            {"label": "Open OTC Desk", "url": "/auth/signup?service=otc", "kind": "link"},
-            {"label": "Open Lending", "url": "/auth/signup?service=lending", "kind": "link"},
+            {"label": "Create Account", "url": "/auth/signup", "kind": "link"},
+            {"label": "Already have an account? Log in", "url": "/auth/login", "kind": "link"},
         ]
     if intent == "balance_check":
         return [
-            {"label": "Open Portfolio", "url": "/portfolio", "kind": "link"},
-            {"label": "Open Wallets", "url": "/wallets", "kind": "link"},
+            {"label": "Open Portfolio", "url": "/dashboard/portfolio", "kind": "link"},
+            {"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"},
         ]
     if intent == "navigate_staking":
         return [
-            {"label": "Open Staking", "url": "/staking", "kind": "link"},
-            {"label": "Staking Details", "url": "/staking#details", "kind": "link"},
+            {"label": "Open Staking", "url": "/dashboard/staking", "kind": "link"},
+            {"label": "Staking Service", "url": "/dashboard/services/staking", "kind": "link"},
         ]
     if intent == "navigate_lending":
         return [
-            {"label": "Open Lending", "url": "/lending", "kind": "link"},
-            {"label": "Loan Calculator", "url": "/lending#calculator", "kind": "link"},
+            {"label": "Open Loans", "url": "/dashboard/loans", "kind": "link"},
+            {"label": "Lending Service", "url": "/dashboard/services/lending", "kind": "link"},
         ]
     if intent == "navigate_custody":
         return [
-            {"label": "Open Custody", "url": "/wallets", "kind": "link"},
-            {"label": "Portfolio", "url": "/portfolio", "kind": "link"},
+            {"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"},
+            {"label": "Custody Service", "url": "/dashboard/services/custody", "kind": "link"},
         ]
     if intent == "navigate_otc":
         return [
-            {"label": "Open OTC Desk", "url": "/otc", "kind": "link"},
-            {"label": "Request Quote", "url": "/otc#new-quote", "kind": "link"},
+            {"label": "Open OTC Desk", "url": "/dashboard/services/otc", "kind": "link"},
         ]
     if intent == "navigate_portfolio":
         return [
-            {"label": "Open Portfolio", "url": "/portfolio", "kind": "link"},
+            {"label": "Open Portfolio", "url": "/dashboard/portfolio", "kind": "link"},
         ]
     if intent == "navigate_settings":
         return [
-            {"label": "Open Settings", "url": "/settings", "kind": "link"},
-            {"label": "Security & 2FA", "url": "/settings#security", "kind": "link"},
+            {"label": "Open Settings", "url": "/dashboard/settings", "kind": "link"},
         ]
     if intent == "navigate_wallets":
         return [
-            {"label": "Open Wallets", "url": "/wallets", "kind": "link"},
+            {"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"},
         ]
     if intent == "withdraw_request":
         return [
-            {"label": "Open Wallets", "url": "/wallets", "kind": "link"},
-            {"label": "Withdrawal Help", "url": "/support?topic=withdrawal", "kind": "link"},
+            {"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"},
         ]
     if intent == "deposit_request":
         return [
-            {"label": "Open Wallets", "url": "/wallets", "kind": "link"},
-            {"label": "How Deposits Work", "url": "/support?topic=deposit", "kind": "link"},
+            {"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"},
         ]
     if intent == "contact_support":
         return [
-            {"label": "Open Support", "url": "/settings?tab=support", "kind": "link"},
-            {"label": "Email Support", "url": "mailto:support@alfardanq9.com", "kind": "link"},
+            {"label": "Email Support", "url": "mailto:institutional@alfardanq9.com", "kind": "link"},
+            {"label": "Open Settings", "url": "/dashboard/settings", "kind": "link"},
         ]
     return None
 
