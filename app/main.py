@@ -45,6 +45,9 @@ from .retrieval.tfidf import (
 from .retrieval import dense as dense_retrieval
 from .compose.entities import extract_entities
 from .compose.composer import compose as compose_reply
+from .refine.typos import correct_typos, preview_corrections
+from .refine.extract import extract_best_sentences
+from .integrations import platform_settings as _platform_settings
 
 
 # ─── Category → default action mapping ────────────────────────────────
@@ -198,15 +201,29 @@ def _followup_for(category: str) -> str | None:
     return _FOLLOWUP_BY_CATEGORY.get(cat)
 
 
-def _humanize_answer(entry, answer: str) -> str:
-    """Trim scraped content + append a follow-up question when missing.
+def _humanize_answer(entry, answer: str, query: str = "") -> str:
+    """Trim long content + append a follow-up question when missing.
 
-    Doesn't touch curated entries — they already have Safiya's voice
-    baked in (short + end with a question).
+    If we have the original user query, we use sentence-level
+    extraction to keep only the 1-2 sentences most relevant to what
+    they asked (rather than dumping the whole KB entry). Scraped
+    content + long curated entries both get this treatment.
+
+    Curated short entries (< 300 chars and ≤ 3 sentences) pass
+    through unchanged — they're already in Safiya's voice.
     """
     out = answer
-    if _is_scraped(entry):
+    # For any long answer where we have the query, pick the best
+    # sentences. Short curated answers pass through since
+    # extract_best_sentences is a no-op under its thresholds.
+    if query and len(out) > 300:
+        out = extract_best_sentences(
+            out, query, n=2, max_chars=360, always_keep_first=True
+        )
+    elif _is_scraped(entry):
+        # Fallback for scraped entries when we don't have the query
         out = _shorten_scraped(out)
+
     if not _ends_with_question(out):
         fu = _followup_for(getattr(entry, "category", ""))
         if fu:
@@ -542,8 +559,9 @@ async def health() -> HealthResponse:
 @app.get("/debug")
 async def debug_info() -> dict:
     """Ops-friendly introspection — which retriever tier is live, how
-    hot the cache is, whether fastembed imported cleanly. Handy when
-    diagnosing a slow or stale chatbot without pulling container logs."""
+    hot the cache is, whether fastembed imported cleanly, plus a peek
+    at the live CRM settings + recent typo-correction examples. Handy
+    when diagnosing without pulling container logs."""
     r = _retriever
     return {
         "retriever_kind": _retriever_kind,
@@ -552,9 +570,37 @@ async def debug_info() -> dict:
         "confidence_threshold": _confidence_threshold(),
         "fastembed_available": dense_retrieval.available(),
         "fastembed_error": dense_retrieval.unavailable_reason() or None,
-        "cache_entries": len(_response_cache),
-        "cache_max": _CACHE_MAX_ENTRIES,
+        "response_cache_entries": len(_response_cache),
+        "response_cache_max": _CACHE_MAX_ENTRIES,
+        "session_cache_sessions": len(_session_cache),
+        "session_cache_max": _SESSION_CACHE_MAX,
+        "platform_settings": _platform_settings.debug_snapshot(),
         "uptime_seconds": time.time() - _start_time,
+    }
+
+
+@app.get("/debug/settings")
+async def debug_settings() -> dict:
+    """What the chatbot currently reads as the source-of-truth for LTV,
+    APY, fees etc. — pulled from the CRM /api/settings every 5 min.
+    Edit the CRM admin page and this should reflect within that window
+    (or instantly after POST /admin/reindex)."""
+    return {
+        "live": _platform_settings.get_settings(),
+        "snapshot": _platform_settings.debug_snapshot(),
+    }
+
+
+@app.get("/debug/typos")
+async def debug_typos(q: str) -> dict:
+    """Show what typo corrections would apply to `q` without actually
+    routing the message. Lets you sanity-check the typo dictionary
+    against real inbound messages from /admin/conversations/export."""
+    fixes = preview_corrections(q)
+    return {
+        "original": q,
+        "corrected": correct_typos(q),
+        "fixes": fixes,
     }
 
 
@@ -574,6 +620,17 @@ async def chat(
         user_id=req.user_id,
         user_email=req.user_email,
     )
+
+    # ─── Typo correction — runs BEFORE everything else ───────────
+    # Common crypto-term misspellings ("lonas", "etherium", "stakign")
+    # get normalised so intent classification + retrieval + composer
+    # all see a clean query. No-op for correctly-spelled inputs.
+    normalised_message = correct_typos(req.message)
+    if normalised_message != req.message:
+        # Swap on a lightweight copy so the original is still logged
+        # to SQLite below (useful for debugging what users actually
+        # typed vs what the bot received).
+        req = req.model_copy(update={"message": normalised_message})
 
     # ─── Response cache ──────────────────────────────────────────
     # Skip recording-cache logic for super-short messages (likely noise
@@ -630,7 +687,7 @@ async def chat(
                     if picked:
                         follow_actions = _actions_for_entry(picked.entry)
                         follow_text = _humanize_answer(
-                            picked.entry, picked.entry.answer
+                            picked.entry, picked.entry.answer, req.message
                         )
                         reply = ChatResponse(
                             reply=follow_text,
@@ -785,7 +842,7 @@ async def chat(
 
     top = hits[0]
     entry_actions = _actions_for_entry(top.entry)
-    humanized = _humanize_answer(top.entry, top.entry.answer)
+    humanized = _humanize_answer(top.entry, top.entry.answer, req.message)
     response = ChatResponse(
         reply=humanized,
         match_type="kb_hit",
@@ -830,13 +887,22 @@ async def chat_history(session_token: str, limit: int = 50):
 
 @app.post("/admin/reindex", response_model=ReindexResponse)
 async def admin_reindex(_: None = Depends(require_admin_secret)) -> ReindexResponse:
-    """Rebuild the index — call after editing the KB.
+    """Rebuild the index — call after editing the KB. Also forces a
+    refresh of the live CRM platform-settings cache so an admin who
+    just edited /admin/settings doesn't have to wait up to 5 minutes
+    for the chatbot to pick up their changes.
 
     Prefers the dense retriever if fastembed is available; falls back
     to TF-IDF. Clears the response cache since answers may have changed.
     """
     global _retriever, _retriever_kind
     t0 = time.time()
+    # Force-refresh the live settings cache — admins often reindex
+    # right after editing a number in the CRM admin page.
+    try:
+        _platform_settings.force_refresh()
+    except Exception as err:  # noqa: BLE001
+        print(f"[reindex] platform_settings refresh failed: {err}")
     if dense_retrieval.available():
         try:
             _retriever = dense_retrieval.build_dense_from_kb(settings.kb_dir)

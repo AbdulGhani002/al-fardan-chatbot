@@ -286,9 +286,20 @@ def classify(text: str) -> Intent:
 def scripted_reply(intent: Intent) -> str | None:
     """Canned response text for intent-matched messages.
 
+    For intents that have multiple phrasings (greeting, goodbye,
+    affirmation, negation, signup, contact_support, balance_check) we
+    pick a random variant from refine.vary — the bot doesn't say the
+    exact same thing every time.
+
     Returns None for intents where we fall through to KB retrieval
     instead (loan_question, staking_question, unknown).
     """
+    # Try the variant pool first — gives the bot human-sounding variety
+    from ..refine.vary import pick_variant  # local import to avoid cycles
+    varied = pick_variant(intent)
+    if varied is not None:
+        return varied
+
     if intent == "greeting":
         return (
             "Assalamu alaikum — I'm Safiya Al Suwaidi, Client Acquisition & "

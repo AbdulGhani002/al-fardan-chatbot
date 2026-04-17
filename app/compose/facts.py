@@ -1,40 +1,62 @@
-"""Structured business facts — single source of truth.
+"""Structured business facts — live-sourced from the CRM.
 
-Instead of writing a prose answer for every phrasing, we define the
-underlying FACTS once here. The composer layer turns these facts
-into natural-sounding answers at runtime.
+Numbers that change (max LTV, APYs, loan rates, FX, fiat minimums,
+BTC/ETH pledge minimums) are fetched LIVE from the CRM's
+/api/settings endpoint via app/integrations/platform_settings.py,
+which caches for 5 minutes. The admin edits numbers in the CRM's
+/admin/settings page and the chatbot picks them up within 5 minutes
+— no chatbot redeploy needed.
 
-Facts that change frequently (APYs, spot prices, LTV) are defined here
-once and referenced everywhere. Editing a single number ripples through
-every answer that uses it.
+Semi-static facts (team names, office locations, heritage story,
+insurance policy number, compliance IDs) live below as module-level
+constants. They change rarely; when they do, a redeploy is fine.
+
+The helpers at the bottom (estimate_loan_capacity_usd, pledge_minimum,
+etc.) always resolve to the current live values so every composed
+answer reflects today's settings.
 """
 
 from __future__ import annotations
 
+from ..integrations import platform_settings as _ps
+
 # ─── Product minimums + tiers ───────────────────────────────────────
 
-MINIMUMS = {
-    # Individual / HNW account
-    "individual_usd": 10_000,
-    # Institutional account
-    "institutional_usd": 100_000,
-    # Starter Access (special-consideration programme)
-    "starter_usd": 3_000,
+# Dict wrapper that always reads the latest live platform settings.
+# Composers use MINIMUMS["pledge_btc"] and get the CURRENT value,
+# even after an admin edits /admin/settings.
+class _LiveMinimums:
+    """Dict-like accessor whose values come from the CRM at call time."""
 
-    # Lending
-    "pledge_btc": 0.5,
-    "pledge_eth": 10,
+    def __getitem__(self, key: str):
+        if key == "pledge_btc":
+            return _ps.min_btc_pledge()
+        if key == "pledge_eth":
+            return _ps.min_eth_pledge()
+        if key == "individual_usd":
+            return 10_000   # Not exposed in CRM settings yet — fixed
+        if key == "institutional_usd":
+            return 100_000
+        if key == "starter_usd":
+            return 3_000
+        if key == "stake_per_network_usd":
+            return 100_000
+        if key == "otc_ticket_usd":
+            return 100_000
+        if key == "airbus_a320_usd":
+            return 20_000
+        if key == "gold_bars_usd":
+            return 88_000
+        raise KeyError(key)
 
-    # Staking
-    "stake_per_network_usd": 100_000,
+    def get(self, key: str, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
-    # OTC
-    "otc_ticket_usd": 100_000,
 
-    # RWA offerings
-    "airbus_a320_usd": 20_000,
-    "gold_bars_usd": 88_000,
-}
+MINIMUMS = _LiveMinimums()
 
 MAXIMUMS = {
     "otc_ticket_usd": 50_000_000,  # $50M+ standard; larger by request
@@ -44,19 +66,42 @@ MAXIMUMS = {
 
 # ─── Lending ────────────────────────────────────────────────────────
 
-LTV = {
-    "max_percent": 75,
-    "margin_call_percent": 85,
-    "liquidation_percent": 90,
-}
+class _LiveLTV:
+    """LTV thresholds sourced live from the CRM."""
 
-LENDING_RATES = {
-    # APR by term (years) — floor for institutional is 3.25% on 5y
-    1: 4.25,
-    2: 3.95,
-    3: 3.50,
-    5: 3.25,
-}
+    def __getitem__(self, key: str):
+        if key == "max_percent":
+            return _ps.max_ltv()
+        if key == "margin_call_percent":
+            return 85   # Not exposed in CRM settings yet — fixed policy
+        if key == "liquidation_percent":
+            return 90
+        raise KeyError(key)
+
+    def get(self, key: str, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+
+LTV = _LiveLTV()
+
+
+class _LiveRates:
+    """Loan APRs sourced live from CRM loanTerms."""
+
+    def __getitem__(self, years: int):
+        return _ps.apr(int(years))
+
+    def get(self, years, default=None):
+        try:
+            return self[int(years)]
+        except Exception:  # noqa: BLE001
+            return default
+
+
+LENDING_RATES = _LiveRates()
 
 LENDING_TIERS = {
     "starter":       {"range_btc": (0.5, 1),   "apr": 4.9,  "label": "Starter"},
@@ -67,16 +112,31 @@ LENDING_TIERS = {
 
 # ─── Staking ────────────────────────────────────────────────────────
 
-STAKING_APY = {
-    "ETH":  5.2,
-    "SOL":  7.1,
-    "POL":  5.8,
-    "MATIC": 5.8,   # alias
-    "ADA":  4.5,
-    "DOT":  14.2,
-    "AVAX": 8.5,
-    "ATOM": 18.5,
-}
+class _LiveStakingAPY:
+    """Staking APYs sourced live from the CRM's stakingApy config."""
+
+    _DEFAULTS = {
+        "ETH": 5.2, "SOL": 7.1, "POL": 5.8, "MATIC": 5.8,
+        "ADA": 4.5, "DOT": 14.2, "AVAX": 8.5, "ATOM": 18.5,
+    }
+
+    def __getitem__(self, asset: str):
+        return self.get(asset)
+
+    def get(self, asset: str, default=None):
+        live = _ps.staking_apy(asset)
+        if live is not None:
+            return live
+        return self._DEFAULTS.get(asset.upper(), default)
+
+    def __contains__(self, asset: str) -> bool:
+        live = _ps.staking_apy(asset)
+        if live is not None:
+            return True
+        return asset.upper() in self._DEFAULTS
+
+
+STAKING_APY = _LiveStakingAPY()
 
 STAKING_UNBONDING_DAYS = {
     "ETH":  1.125,   # ~27 hours
@@ -174,8 +234,39 @@ CONTACTS = {
 
 # ─── Pricing / FX ───────────────────────────────────────────────────
 
-AED_USD_PEG = 3.67  # fixed UAE peg
-EUR_USD = 0.94      # admin-published, ish
+def _aed_peg() -> float:
+    return _ps.aed_peg()
+
+
+def _eur_usd() -> float:
+    return _ps.eur_rate()
+
+
+# Back-compat module-level attributes — callers can still read them,
+# but each access re-reads the live value.
+class _FXProxy:
+    @property
+    def aed(self) -> float:
+        return _ps.aed_peg()
+
+    @property
+    def eur(self) -> float:
+        return _ps.eur_rate()
+
+
+_FX = _FXProxy()
+AED_USD_PEG = _FX.aed  # re-read by reference pattern below
+EUR_USD = _FX.eur
+
+
+def __getattr__(name):
+    """Module-level dynamic attribute — always returns the LATEST live
+    value for AED_USD_PEG / EUR_USD instead of a stale snapshot."""
+    if name == "AED_USD_PEG":
+        return _ps.aed_peg()
+    if name == "EUR_USD":
+        return _ps.eur_rate()
+    raise AttributeError(name)
 
 # Spot-ish reference prices (used only for sizing estimates in composed
 # answers — live prices come from priceMap in the CRM, not here).
