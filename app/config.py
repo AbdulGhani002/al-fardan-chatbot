@@ -47,7 +47,14 @@ class Settings(BaseSettings):
     top_k: int = 3
 
     # Data paths
+    # `data_dir` holds immutable deploy-time artifacts (KB source + the
+    # built index pickle) and ships INSIDE the image — never mount a
+    # volume over it or fresh deploys will be shadowed by stale state.
     data_dir: Path = REPO_ROOT / "app" / "data"
+    # `state_dir` holds runtime state that must persist across restarts
+    # (chat history + admin unanswered-queries queue). This IS where a
+    # docker volume gets mounted.
+    state_dir: Path = REPO_ROOT / "app" / "state"
 
     # CORS — comma-separated list of allowed origins for the widget
     cors_origins: str = (
@@ -65,7 +72,9 @@ class Settings(BaseSettings):
 
     @property
     def db_path(self) -> Path:
-        return self.data_dir / "chat.db"
+        # Lives in `state_dir` (volume-mounted) so chat history survives
+        # container restarts without shadowing the KB + index artifacts.
+        return self.state_dir / "chat.db"
 
     @property
     def cors_origins_list(self) -> list[str]:

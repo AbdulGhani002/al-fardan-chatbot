@@ -10,9 +10,16 @@ services:
     env_file:
       - .env
     ports:
-      - "8001:8001"
+      # Local-only — nginx reverse-proxies 443 → here.
+      - "127.0.0.1:8001:8001"
     volumes:
-      - chatbot-data:/app/app/data
+      # ⚠️ ONLY persist runtime state here (SQLite chat history +
+      # unanswered-query admin queue). NEVER mount a volume over
+      # /app/app/data/ — that directory holds deploy-time artifacts
+      # (KB source + the built TF-IDF index pickle) that must come
+      # from the fresh image on every build, otherwise stale state
+      # shadows new deploys.
+      - chatbot-state:/app/app/state
     logging:
       driver: "json-file"
       options:
@@ -20,5 +27,5 @@ services:
         max-file: "3"
 
 volumes:
-  chatbot-data:
+  chatbot-state:
     driver: local
