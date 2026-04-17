@@ -103,9 +103,18 @@ _SIGNUP_RE = re.compile(
     r")\b",
     re.I,
 )
+# Balance check fires ONLY when the user is asking to look at/check a
+# balance — not when they just happen to mention "my assets" in a
+# different context (e.g. "are my assets protected?" which is about
+# safety, not balance). Require an action verb or a balance-specific noun.
 _BALANCE_RE = re.compile(
-    r"\b(balance|my\s+(portfolio|holdings?|assets?|wallet)|"
-    r"how\s+much\s+(do\s+)?i\s+have|net\s+worth|total\s+value)\b",
+    r"\b("
+    r"(show|check|see|view|look\s+at|display|open|where\s+is)\s+"
+    r"my\s+(balance|portfolio|holdings?|wallet|assets?)|"
+    r"how\s+much\s+(do\s+)?i\s+have|"
+    r"what('s|\s+is)\s+my\s+(balance|net\s+worth|total)|"
+    r"my\s+balance|current\s+balance"
+    r")\b",
     re.I,
 )
 
@@ -145,10 +154,16 @@ _GOTO_CUSTODY_RE = re.compile(
     r"open\s+custody|see\s+my\s+vault)\b",
     re.I,
 )
+# navigate_otc fires only when the user wants to OPEN the OTC page, not
+# when they're asking a specific quantitative question about OTC (those
+# should flow to KB so we answer the specific question, not just drop
+# a navigation button).
 _GOTO_OTC_RE = re.compile(
-    r"\b(otc|otc\s+(desk|quote|trade)|take\s+me\s+to\s+otc|"
-    r"go\s+to\s+otc|open\s+otc|block\s+trade|large\s+trade|"
-    r"request\s+(a\s+)?quote|get\s+a\s+quote)\b",
+    r"\b("
+    r"take\s+me\s+to\s+otc|go\s+to\s+otc|open\s+otc|"
+    r"new\s+quote|request\s+(a\s+)?quote|get\s+a\s+quote|place\s+an?\s+otc|"
+    r"otc\s+page|otc\s+desk\s+page"
+    r")\b",
     re.I,
 )
 _GOTO_PORTFOLIO_RE = re.compile(
@@ -232,7 +247,16 @@ def classify(text: str) -> Intent:
         return "contact_support"
 
     # ─── Signup flow — user wants to create an account ────────────
-    if _SIGNUP_RE.search(text):
+    # Skip signup intent if the message also contains a specific money
+    # amount or minimum/qualify keyword — those are quantitative
+    # questions best answered by retrieval (e.g. "I have $5,000, can
+    # I open an account?" should return the $5,000-specific answer,
+    # not the generic signup reply).
+    has_amount = bool(re.search(r"(\$\s?\d|\d+\s*(dollar|usd|aed|eur|eth|btc|sol|k\b|thousand|million))", text, re.I))
+    has_minimum_question = bool(
+        re.search(r"\b(minimum|min\b|enough|qualify|at\s+least)\b", text, re.I)
+    )
+    if _SIGNUP_RE.search(text) and not (has_amount or has_minimum_question):
         return "signup"
 
     # ─── Info-question intents ────────────────────────────────────

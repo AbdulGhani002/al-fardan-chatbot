@@ -414,6 +414,118 @@ def _cache_invalidate_all() -> None:
         _response_cache.clear()
 
 
+# ─── Per-session conversation memory ────────────────────────────────
+# In-process ring buffer of the last ~3 turn-pairs per session_token.
+# Used to:
+#   1. Continue a topic when a user sends a short affirmation ("yeah")
+#      — we know what the bot just asked and can extend the answer.
+#   2. Disambiguate follow-up questions ("how much?") by concatenating
+#      the previous user query with the current one for retrieval.
+#
+# Why in-process + not SQLite-backed? Latency. The SQLite chat_messages
+# table already persists everything for training export. This cache is
+# just a hot read-path for retrieval-time context — stale entries
+# eviction is automatic via the 30-minute TTL.
+
+_SESSION_CACHE_MAX = 5_000          # cap on unique active sessions
+_SESSION_TURNS_PER = 3              # keep last 3 turn-pairs per session
+_SESSION_TTL_SECONDS = 1_800        # 30 minutes of idle = forget
+
+# Session cache shape:
+#   session_token -> {
+#       "last_touch_ts": 1.7e9,
+#       "turns": [
+#           {"user": "...", "bot": "...", "matched_entry": "bw011", ...},
+#           ...
+#       ],
+#   }
+_session_cache: "OrderedDict[str, dict]" = OrderedDict()
+_session_lock = threading.Lock()
+
+
+def _session_record_turn(
+    session_token: str,
+    user_text: str,
+    bot_text: str,
+    match_type: str,
+    matched_entry: str | None,
+    match_score: float | None,
+) -> None:
+    """Push a user+bot turn pair into the session's ring buffer."""
+    now = time.time()
+    with _session_lock:
+        entry = _session_cache.get(session_token)
+        if entry is None:
+            entry = {"last_touch_ts": now, "turns": []}
+            _session_cache[session_token] = entry
+        turns = entry["turns"]
+        turns.append(
+            {
+                "user": user_text,
+                "bot": bot_text,
+                "match_type": match_type,
+                "matched_entry": matched_entry,
+                "match_score": match_score,
+                "ts": now,
+            }
+        )
+        # Keep only the last N turns
+        if len(turns) > _SESSION_TURNS_PER:
+            del turns[: len(turns) - _SESSION_TURNS_PER]
+        entry["last_touch_ts"] = now
+        _session_cache.move_to_end(session_token)
+        # Evict expired + cap size
+        _session_evict_locked(now)
+
+
+def _session_evict_locked(now: float) -> None:
+    """Remove expired + over-cap entries. Caller holds the lock."""
+    expired = [
+        k for k, v in _session_cache.items()
+        if now - v["last_touch_ts"] > _SESSION_TTL_SECONDS
+    ]
+    for k in expired:
+        _session_cache.pop(k, None)
+    while len(_session_cache) > _SESSION_CACHE_MAX:
+        _session_cache.popitem(last=False)
+
+
+def _session_get_turns(session_token: str) -> list[dict]:
+    """Return up to the last 3 turn-pairs for a session (empty if none)."""
+    with _session_lock:
+        entry = _session_cache.get(session_token)
+        if entry is None:
+            return []
+        if time.time() - entry["last_touch_ts"] > _SESSION_TTL_SECONDS:
+            _session_cache.pop(session_token, None)
+            return []
+        return list(entry["turns"])
+
+
+def _session_previous_bot_turn(session_token: str) -> dict | None:
+    """Just the most recent bot turn for this session, or None."""
+    turns = _session_get_turns(session_token)
+    return turns[-1] if turns else None
+
+
+def _build_contextual_query(session_token: str, current_message: str) -> str:
+    """For short follow-up queries ('yes', 'how much?', 'what about eth?')
+    augment with the previous user turn so the retriever sees enough
+    signal to find the right entry. For longer messages we pass through
+    unchanged — they already have enough context on their own.
+    """
+    if len(current_message.split()) > 6:
+        return current_message
+    turns = _session_get_turns(session_token)
+    if not turns:
+        return current_message
+    # Concatenate the previous user query for a richer signal
+    prev_user = turns[-1].get("user") or ""
+    if prev_user and prev_user.strip().lower() != current_message.strip().lower():
+        return f"{prev_user} {current_message}".strip()
+    return current_message
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     r = _retriever
@@ -483,9 +595,64 @@ async def chat(
 
     intent = classify(req.message)
 
-    # Scripted replies beat retrieval for well-defined intents
+    # Scripted replies beat retrieval for well-defined intents.
+    # For affirmations ("yeah", "sure"), we try to continue the topic
+    # using session memory BEFORE falling back to the generic reply.
     scripted = scripted_reply(intent)
     if scripted is not None:
+        # ─── Conversation-memory enhancement for affirmations ──────
+        # If the user just said "yes/yeah/sure" and we have a previous
+        # bot turn in this session, we give a topic-aware continuation
+        # instead of the generic "what would you like to do next?"
+        if intent == "affirmation":
+            prev_bot = _session_previous_bot_turn(req.session_token)
+            if prev_bot and prev_bot.get("matched_entry"):
+                # Try to re-search the previous user query to fetch a
+                # deeper follow-up answer in the same topic
+                prev_user = prev_bot.get("user", "")
+                if prev_user:
+                    follow_hits = r.search(
+                        f"{prev_user} tell me more details",
+                        top_k=settings.top_k,
+                    )
+                    # Take a different entry than the previous one so
+                    # the user gets fresh information, not a repeat.
+                    picked = next(
+                        (
+                            h for h in (follow_hits or [])
+                            if h.entry.id != prev_bot.get("matched_entry")
+                            and h.score >= _confidence_threshold()
+                        ),
+                        None,
+                    )
+                    if picked:
+                        follow_actions = _actions_for_entry(picked.entry)
+                        follow_text = _humanize_answer(
+                            picked.entry, picked.entry.answer
+                        )
+                        reply = ChatResponse(
+                            reply=follow_text,
+                            match_type="kb_hit",
+                            matched_entry_id=picked.entry.id,
+                            match_score=picked.score,
+                            session_token=req.session_token,
+                            actions=follow_actions or None,
+                        )
+                        record_message(
+                            settings.db_path,
+                            session_token=req.session_token,
+                            role="bot",
+                            text=reply.reply,
+                            match_type=reply.match_type,
+                            matched_entry=picked.entry.id,
+                            match_score=picked.score,
+                        )
+                        _session_record_turn(
+                            req.session_token, req.message, reply.reply,
+                            reply.match_type, picked.entry.id, picked.score,
+                        )
+                        return reply
+
         actions = _actions_from_list(scripted_actions(intent))
         reply = ChatResponse(
             reply=scripted,
@@ -505,10 +672,17 @@ async def chat(
             text=reply.reply,
             match_type=reply.match_type,
         )
+        _session_record_turn(
+            req.session_token, req.message, reply.reply,
+            reply.match_type, None, None,
+        )
         return reply
 
     # Fall through to semantic retrieval (dense) or TF-IDF (fallback)
-    hits = r.search(req.message, top_k=settings.top_k)
+    # For short follow-up queries we augment with the previous user turn
+    # so the retriever has enough context to resolve "how much?" etc.
+    search_query = _build_contextual_query(req.session_token, req.message)
+    hits = r.search(search_query, top_k=settings.top_k)
     threshold = _confidence_threshold()
 
     if not hits or hits[0].score < threshold:
@@ -553,6 +727,10 @@ async def chat(
             matched_entry=nearest,
             match_score=best_score,
         )
+        _session_record_turn(
+            req.session_token, req.message, reply_text,
+            response.match_type, nearest, best_score,
+        )
         return response
 
     top = hits[0]
@@ -582,11 +760,19 @@ async def chat(
         matched_entry=top.entry.id,
         match_score=top.score,
     )
+    _session_record_turn(
+        req.session_token, req.message, humanized,
+        "kb_hit", top.entry.id, top.score,
+    )
     return response
 
 
 @app.get("/chat/history")
 async def chat_history(session_token: str, limit: int = 50):
+    """Return a session's chat history so the widget can restore the
+    conversation UI after a page reload. Public endpoint (the session
+    token is effectively the capability — only the holder of the token
+    can read that conversation)."""
     return {"data": get_history(settings.db_path, session_token, limit)}
 
 
