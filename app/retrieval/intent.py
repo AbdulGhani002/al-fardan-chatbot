@@ -36,8 +36,56 @@ Intent = Literal[
     "withdraw_request",
     "deposit_request",
     "contact_support",
+    "affirmation",   # "yes / yeah / sure / ok / sounds good"
+    "negation",      # "no / nope / not really"
     "unknown",
 ]
+
+
+# A short list of substantive tokens we look for to decide if a message
+# is more than just a greeting. If the user typed "hi" they probably
+# want the greeting flow; if they typed "hi, i am new to crypto" the
+# "new to crypto" part is what matters — the greeting intent should
+# NOT shadow the substantive ask.
+_SUBSTANTIVE_RE = re.compile(
+    r"\b("
+    r"crypto|btc|bitcoin|eth|ethereum|sol|solana|coin|token|stak\w*|"
+    r"invest\w*|lend\w*|borrow\w*|loan\w*|yield|apy|rewards?|"
+    r"wallet|custody|portfolio|account|balance|otc|desk|trade|trading|"
+    r"signup|sign\s*up|register|start|begin|kyc|verify|"
+    r"deposit|withdraw|transfer|buy|sell|price|fee|"
+    r"sharia|halal|murabaha|safe|scam|trust|hack|insurance|"
+    r"sheikh|khalid|fatima|layla|hamdan|omar|nadia|"
+    r"new\s+to|don't\s+know|need\s+help|how\s+(do|can)\s+i|"
+    r"starter|family|office|institution"
+    r")\b",
+    re.I,
+)
+
+
+# Short affirmations / negations. We only match when the WHOLE message
+# is one of these — otherwise we let retrieval handle richer replies.
+_AFFIRMATION_ONLY_RE = re.compile(
+    r"^\s*("
+    r"yes+|yeah+|yep+|yup+|ya|sure|ok+|okay+|"
+    r"absolutely|definitely|of\s+course|sounds?\s+good|"
+    r"please|please\s+do|go\s+ahead|great|perfect|"
+    r"great\.?|perfect\.?|nice|cool|awesome|wonderful|"
+    r"lets\s+go|let's\s+go|lets\s+do\s+it|let's\s+do\s+it|"
+    r"👍+|✅+"
+    r")\s*[.!?]*\s*$",
+    re.I,
+)
+
+_NEGATION_ONLY_RE = re.compile(
+    r"^\s*("
+    r"no+|nope|nah|not\s+really|not\s+now|"
+    r"no\s+thanks?|no\s+thank\s+you|maybe\s+later|"
+    r"not\s+yet|skip|pass|"
+    r"👎+|❌+"
+    r")\s*[.!?]*\s*$",
+    re.I,
+)
 
 
 _GREETING_RE = re.compile(
@@ -144,9 +192,22 @@ def classify(text: str) -> Intent:
     Order matters: action intents (I want to DO X) win over generic
     topic intents (I have a question ABOUT X). Within action intents,
     verbs of "start / go / take me to" win over pure navigation words.
+
+    Greeting / goodbye intents are DELIBERATELY downranked — they only
+    fire when the message is essentially JUST a greeting (no crypto
+    content, short length). This prevents "Hi, I'm new to crypto" from
+    being misread as a bare greeting — the substantive content wins.
     """
     if not text or not text.strip():
         return "unknown"
+
+    # ─── Pure short affirmations / negations — handled first ──────
+    # Matched ONLY when the ENTIRE message is one of these; a longer
+    # "yes I do want to stake" would fall through to the retriever.
+    if _AFFIRMATION_ONLY_RE.match(text):
+        return "affirmation"
+    if _NEGATION_ONLY_RE.match(text):
+        return "negation"
 
     # ─── Action / navigation intents — highest priority ────────────
     if _START_STAKING_RE.search(text):
@@ -182,10 +243,16 @@ def classify(text: str) -> Intent:
     if _STAKING_Q_RE.search(text):
         return "staking_question"
 
-    # ─── Social intents — matched last so specific intents win ────
-    if _GREETING_RE.search(text):
+    # ─── Social intents — only if message is mostly just a greeting
+    # This fixes the "Hi, I am new to crypto" bug. We refuse to treat
+    # a message as a bare greeting if it also carries substantive
+    # crypto / signup / product content — let retrieval take it.
+    has_substantive_content = bool(_SUBSTANTIVE_RE.search(text))
+    is_short = len(text.split()) <= 4
+
+    if _GREETING_RE.search(text) and is_short and not has_substantive_content:
         return "greeting"
-    if _GOODBYE_RE.search(text):
+    if _GOODBYE_RE.search(text) and is_short and not has_substantive_content:
         return "goodbye"
     return "unknown"
 
@@ -284,6 +351,20 @@ def scripted_reply(intent: Intent) -> str | None:
             "submit a ticket from Settings → Support. For urgent security issues "
             "call +971-4-xxx-xxxx. Tap \"Open Support\" below to raise a ticket."
         )
+    if intent == "affirmation":
+        # We don't track conversation state yet, so we can't know what
+        # the user is affirming. Give a warm continuation prompt + quick
+        # paths into the common flows.
+        return (
+            "Great — happy to help. What would you like to do next? "
+            "Open an account, see our products, or ask something specific?"
+        )
+    if intent == "negation":
+        return (
+            "No worries — take your time. What else can I help with? "
+            "I can explain products, fees, or how we're regulated. "
+            "Whatever's useful."
+        )
     return None
 
 
@@ -350,6 +431,15 @@ def scripted_actions(intent: Intent) -> list[dict] | None:
             {"label": "Email Support", "url": "mailto:institutional@alfardanq9.com", "kind": "link"},
             {"label": "Open Settings", "url": "/dashboard/settings", "kind": "link"},
         ]
+    if intent == "affirmation":
+        # Offer the most common next-steps any new visitor might want.
+        return [
+            {"label": "Create Account", "url": "/auth/signup", "kind": "link"},
+            {"label": "Open Dashboard", "url": "/dashboard", "kind": "link"},
+            {"label": "Email Support", "url": "mailto:institutional@alfardanq9.com", "kind": "link"},
+        ]
+    if intent == "negation":
+        return None  # Don't push links when they just said no
     return None
 
 
@@ -370,6 +460,10 @@ _INTENT_TO_MATCH_TYPE = {
     "withdraw_request": "intent_withdraw",
     "deposit_request": "intent_deposit",
     "contact_support": "intent_contact_support",
+    # Short yes/no — map to generic intent types so the widget can
+    # still render actions the usual way.
+    "affirmation": "intent_affirmation",
+    "negation": "intent_negation",
 }
 
 

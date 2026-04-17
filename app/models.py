@@ -48,6 +48,8 @@ MatchType = Literal[
     "intent_contact_support",
     "intent_withdraw",
     "intent_deposit",
+    "intent_affirmation",
+    "intent_negation",
     "system_error",
 ]
 
