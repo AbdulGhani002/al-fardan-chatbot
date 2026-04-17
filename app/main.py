@@ -118,6 +118,97 @@ def _actions_from_list(raw: list[dict] | None) -> list[ChatAction] | None:
     ]
 
 
+# ─── Response post-processor ─────────────────────────────────────────
+# Scraped content from Wikipedia / ethereum.org / bitcoin.org is often
+# 500-1200 chars long — fine for a reference doc, but robotic inside a
+# chat bubble next to Safiya's photo. This post-processor trims scraped
+# answers to the first couple of sentences and appends a contextual
+# follow-up question if one isn't already there. Curated KB entries are
+# left untouched — the human voice is already in the source.
+import re as _re
+
+_SCRAPED_ID_PREFIX = "scraped:"
+_MAX_SCRAPED_SENTENCES = 2
+_MAX_SCRAPED_CHARS = 500
+
+
+def _is_scraped(entry) -> bool:
+    eid = getattr(entry, "id", "")
+    return isinstance(eid, str) and eid.startswith(_SCRAPED_ID_PREFIX)
+
+
+def _shorten_scraped(text: str) -> str:
+    """Take the first 1-2 sentences of a scraped answer so the bot
+    doesn't paste a Wikipedia paragraph into a chat bubble."""
+    if len(text) <= _MAX_SCRAPED_CHARS:
+        return text
+    # Split on sentence terminators that are followed by space + capital —
+    # better than a naive split on "." which mangles "U.S." and "e.g."
+    sentences = _re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
+    if len(sentences) <= _MAX_SCRAPED_SENTENCES:
+        return text[:_MAX_SCRAPED_CHARS].rsplit(" ", 1)[0] + "…"
+    short = " ".join(sentences[:_MAX_SCRAPED_SENTENCES])
+    if len(short) > _MAX_SCRAPED_CHARS:
+        short = short[:_MAX_SCRAPED_CHARS].rsplit(" ", 1)[0] + "…"
+    return short
+
+
+# Follow-up question templates per category — appended to any answer
+# that doesn't already end with a question. Keeps the conversation
+# flowing instead of terminating on a declarative statement.
+_FOLLOWUP_BY_CATEGORY: dict[str, str] = {
+    "lending": "Want me to price a specific loan for you?",
+    "staking": "Which network were you thinking about?",
+    "otc": "What size trade are you looking at?",
+    "custody": "Want to start with a small deposit to try it out?",
+    "onboarding": "Want me to walk you through the first step?",
+    "security": "Any specific concern I can go deeper on?",
+    "rwa": "Want to join the waiting list?",
+    "crypto": "Want me to explain how this applies to your situation?",
+    "company": "Anything else you'd like to know about us?",
+    "support": "What else can I help with?",
+    "pricing": "Want me to estimate the cost for your size?",
+}
+
+_CATEGORY_ALIASES = {
+    # Categories used by the scrapers map to curated categories for
+    # follow-up selection.
+    "bitcoin_org": "crypto",
+    "ethereum_org": "crypto",
+    "wikipedia_org": "crypto",
+    "bitcoin": "crypto",
+}
+
+
+def _ends_with_question(text: str) -> bool:
+    """True if the text ends with '?' (allowing trailing whitespace /
+    closing quotes / period-after-question)."""
+    stripped = text.rstrip(' ."\'""…')
+    return stripped.endswith("?")
+
+
+def _followup_for(category: str) -> str | None:
+    cat = (category or "").lower()
+    cat = _CATEGORY_ALIASES.get(cat, cat)
+    return _FOLLOWUP_BY_CATEGORY.get(cat)
+
+
+def _humanize_answer(entry, answer: str) -> str:
+    """Trim scraped content + append a follow-up question when missing.
+
+    Doesn't touch curated entries — they already have Safiya's voice
+    baked in (short + end with a question).
+    """
+    out = answer
+    if _is_scraped(entry):
+        out = _shorten_scraped(out)
+    if not _ends_with_question(out):
+        fu = _followup_for(getattr(entry, "category", ""))
+        if fu:
+            out = f"{out.rstrip()} {fu}"
+    return out
+
+
 # ─── App bootstrap ─────────────────────────────────────────────────────
 
 app = FastAPI(
@@ -463,8 +554,9 @@ async def chat(
 
     top = hits[0]
     entry_actions = _actions_for_entry(top.entry)
+    humanized = _humanize_answer(top.entry, top.entry.answer)
     response = ChatResponse(
-        reply=top.entry.answer,
+        reply=humanized,
         match_type="kb_hit",
         matched_entry_id=top.entry.id,
         match_score=top.score,
@@ -482,7 +574,7 @@ async def chat(
         settings.db_path,
         session_token=req.session_token,
         role="bot",
-        text=top.entry.answer,
+        text=humanized,
         match_type="kb_hit",
         matched_entry=top.entry.id,
         match_score=top.score,

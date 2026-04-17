@@ -200,21 +200,18 @@ def scripted_reply(intent: Intent) -> str | None:
     """
     if intent == "greeting":
         return (
-            "Assalamu alaikum! I'm Al-Fardan Q9's assistant. I can help you with "
-            "Custody, Staking, OTC Desk, or Lending — or answer questions about "
-            "crypto in general. What brings you here today?"
+            "Assalamu alaikum — I'm Safiya. Happy to help you with Custody, "
+            "Staking, OTC, or Lending. What brings you here today?"
         )
     if intent == "goodbye":
         return (
-            "Thank you for reaching out. If you need anything else, you can reach "
-            "your relationship manager through the portal, or just open this chat "
-            "again. Have a great day."
+            "Take care — I'm here whenever you need. Urgent? "
+            "institutional@alfardanq9.com covers you 24/7."
         )
     if intent == "signup":
         return (
-            "Happy to help you open an account. We offer four services — Custody, "
-            "Staking, OTC Desk, and Lending. Pick one from the buttons below (or "
-            "tell me which you'd like to start with)."
+            "Happy to help you open an account — takes about 5 minutes. "
+            "Which service are you most interested in first?"
         )
     if intent == "balance_check":
         return (
