@@ -43,6 +43,8 @@ from .retrieval.tfidf import (
     build_retriever_from_kb,
 )
 from .retrieval import dense as dense_retrieval
+from .compose.entities import extract_entities
+from .compose.composer import compose as compose_reply
 
 
 # ─── Category → default action mapping ────────────────────────────────
@@ -677,6 +679,54 @@ async def chat(
             reply.match_type, None, None,
         )
         return reply
+
+    # ─── Fact composer — no-LLM generative pass ─────────────────
+    # Extract structured entities (amounts, assets, actions, crisis/
+    # beginner flags) and try to COMPOSE a fresh answer from the
+    # business-facts in app/compose/facts.py. If the composer is
+    # confident (covered pattern), we use its reply and skip retrieval
+    # entirely. If not, fall through to the semantic retriever.
+    #
+    # This scales better than hardcoding every phrasing: one fact
+    # answers every variant of "I have $X can I join".
+    entities = extract_entities(req.message)
+    composed = compose_reply(entities)
+    if composed is not None:
+        composed_text, composed_actions = composed
+        composed_text = composed_text.strip()
+        composed_action_list = [
+            ChatAction(label=a["label"], url=a["url"], kind=a.get("kind", "link"))
+            for a in (composed_actions or [])
+        ] or None
+        response = ChatResponse(
+            reply=composed_text,
+            match_type="kb_hit",
+            matched_entry_id="composer",
+            match_score=0.99,
+            session_token=req.session_token,
+            actions=composed_action_list,
+        )
+        record_message(
+            settings.db_path,
+            session_token=req.session_token,
+            role="bot",
+            text=composed_text,
+            match_type="kb_hit",
+            matched_entry="composer",
+            match_score=0.99,
+        )
+        _session_record_turn(
+            req.session_token, req.message, composed_text,
+            "kb_hit", "composer", 0.99,
+        )
+        # Cache the composed answer so repeated identical queries are
+        # served sub-ms.
+        if len(req.message) >= 3:
+            _cache_put(
+                req.message,
+                response.model_dump(exclude={"session_token"}),
+            )
+        return response
 
     # Fall through to semantic retrieval (dense) or TF-IDF (fallback)
     # For short follow-up queries we augment with the previous user turn
