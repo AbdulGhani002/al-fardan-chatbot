@@ -1,5 +1,10 @@
 """Template-based response composer — the no-LLM answer generator.
 
+Also handles CLARIFICATION: if the user mentions an action (borrow,
+stake, withdraw) but leaves out the critical info (amount, asset),
+the composer asks back instead of guessing. Good bots ask good
+questions.
+
 Takes an entity dict (from entities.extract_entities) and synthesises
 a Safiya-voiced reply from the structured facts in facts.py.
 
@@ -190,6 +195,65 @@ def _compose_crisis(text: str) -> str:
     )
 
 
+# ─── Clarification: ask back when key info is missing ─────────────
+
+def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
+    """If the user stated an intent but left out the critical info,
+    ask for it instead of guessing."""
+    actions = entities.get("actions") or []
+    amounts = entities.get("amounts") or []
+    assets = entities.get("assets") or []
+    text = (entities.get("text") or "").lower()
+
+    # Short question — don't clarify on casual questions
+    is_short_question = len(text.split()) <= 3
+
+    # "I want to borrow" / "can i take a loan" — no amount, no asset
+    if "borrow" in actions and not amounts and not assets and not is_short_question:
+        return (
+            "Happy to help with a loan. Two things: how much do you want "
+            "to borrow (USD, AED, or EUR), and how much BTC or ETH can "
+            "you pledge as collateral?",
+            [{"label": "Loan Calculator", "url": "/dashboard/loans", "kind": "link"}],
+        )
+
+    # "I want to stake" — no amount, no asset
+    if "stake" in actions and not amounts and not assets and not is_short_question:
+        return (
+            "Good choice — which network would you like to stake? We "
+            "support ETH, SOL, POL, ADA, DOT, AVAX, and ATOM. And "
+            "roughly how much?",
+            [{"label": "Open Staking", "url": "/dashboard/staking", "kind": "link"}],
+        )
+
+    # "I want to withdraw" — no asset/amount
+    if "withdraw" in actions and not amounts and not assets and not is_short_question:
+        return (
+            "Sure — which asset are you withdrawing, and how much? "
+            "Typical processing: 1-4 hours for crypto, 24 hours for fiat wire.",
+            [{"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"}],
+        )
+
+    # "I want to deposit" — no asset
+    if "deposit" in actions and not assets and not is_short_question:
+        return (
+            "Pick an asset and I'll get you a deposit address. BTC, ETH, "
+            "SOL, USDT, or USDC? (We support 40+ networks — which one?)",
+            [{"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"}],
+        )
+
+    # "how much can i get/earn/borrow" without asset or amount
+    if ("borrow" in actions or "earn" in actions) and not amounts and not assets:
+        if "how much" in text:
+            return (
+                "Happy to run the numbers. Quick question: which asset "
+                "(BTC or ETH), and how much of it do you have?",
+                [{"label": "Loan Calculator", "url": "/dashboard/loans", "kind": "link"}],
+            )
+
+    return None
+
+
 # ─── Top-level compose() ───────────────────────────────────────────
 
 def compose(entities: dict) -> Optional[tuple[str, list[dict]]]:
@@ -210,8 +274,13 @@ def compose(entities: dict) -> Optional[tuple[str, list[dict]]]:
             ],
         )
 
-    # Quantitative flows — we need an amount to be useful
+    # Clarification — if user stated an action but left out required
+    # info, ask back before giving a generic reply or falling to the
+    # retriever.
     if not amounts:
+        clarification = _compose_clarification(entities)
+        if clarification is not None:
+            return clarification
         return None
 
     # Pick the first/most-relevant amount
@@ -324,6 +393,14 @@ def compose(entities: dict) -> Optional[tuple[str, list[dict]]]:
             return reply, [
                 {"label": "Create Account", "url": "/auth/signup", "kind": "link"},
             ]
+
+    # ─── Clarification — ask back instead of guessing ───────────
+    # If the user expressed an intent (borrow / stake / withdraw) but
+    # left out the specifics, ask for them instead of dumping a
+    # generic answer or falling through to the retriever.
+    clarification = _compose_clarification(entities)
+    if clarification is not None:
+        return clarification
 
     # ─── Composer isn't confident — fall back to retrieval ───────
     return None

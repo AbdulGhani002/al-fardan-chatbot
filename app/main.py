@@ -47,6 +47,8 @@ from .compose.entities import extract_entities
 from .compose.composer import compose as compose_reply
 from .refine.typos import correct_typos, preview_corrections
 from .refine.extract import extract_best_sentences
+from .refine.emotion import detect as detect_mood, acknowledgment, escalation_actions
+from .refine.synonyms import expand as expand_synonyms
 from .integrations import platform_settings as _platform_settings
 
 
@@ -632,6 +634,12 @@ async def chat(
         # typed vs what the bot received).
         req = req.model_copy(update={"message": normalised_message})
 
+    # ─── Emotion / mood detection ────────────────────────────────
+    # Used AFTER retrieval/compose to (a) add an acknowledgement
+    # prefix + (b) surface human-handoff buttons if the user is
+    # frustrated or reporting something urgent.
+    mood = detect_mood(req.message)
+
     # ─── Response cache ──────────────────────────────────────────
     # Skip recording-cache logic for super-short messages (likely noise
     # or greetings handled by intent); cache only substantive queries.
@@ -788,8 +796,12 @@ async def chat(
     # Fall through to semantic retrieval (dense) or TF-IDF (fallback)
     # For short follow-up queries we augment with the previous user turn
     # so the retriever has enough context to resolve "how much?" etc.
+    # Then expand the query with domain synonyms (borrow → loan/credit/
+    # lending/murabaha) so the retriever can match entries using
+    # different wording than the user chose.
     search_query = _build_contextual_query(req.session_token, req.message)
-    hits = r.search(search_query, top_k=settings.top_k)
+    expanded_query = expand_synonyms(search_query)
+    hits = r.search(expanded_query, top_k=settings.top_k)
     threshold = _confidence_threshold()
 
     if not hits or hits[0].score < threshold:
@@ -843,13 +855,28 @@ async def chat(
     top = hits[0]
     entry_actions = _actions_for_entry(top.entry)
     humanized = _humanize_answer(top.entry, top.entry.answer, req.message)
+
+    # ─── Apply mood-aware adjustments ─────────────────────────────
+    # Prepend a short acknowledgement if the user sounded frustrated,
+    # urgent, confused, or excited. Surface human-handoff buttons as
+    # the FIRST actions when mood warrants (frustrated/urgent).
+    if mood.has_any:
+        ack = acknowledgment(mood)
+        if ack:
+            humanized = ack + humanized
+    mood_actions = [
+        ChatAction(label=a["label"], url=a["url"], kind=a.get("kind", "link"))
+        for a in escalation_actions(mood)
+    ]
+    final_actions = (mood_actions + (entry_actions or [])) or None
+
     response = ChatResponse(
         reply=humanized,
         match_type="kb_hit",
         matched_entry_id=top.entry.id,
         match_score=top.score,
         session_token=req.session_token,
-        actions=entry_actions or None,
+        actions=final_actions,
     )
     # Cache the confident answer — subsequent identical queries are
     # served from memory in sub-ms rather than re-embedding.

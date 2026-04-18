@@ -88,6 +88,20 @@ class SearchResult:
 
 # ─── KB loading ───────────────────────────────────────────────────────
 
+def replace_id(entry: "KbEntry", new_id: str) -> "KbEntry":
+    """Return a shallow copy of the entry with its id replaced.
+    Used by load_kb() to uniquify duplicates rather than drop them."""
+    return KbEntry(
+        id=new_id,
+        category=entry.category,
+        question=entry.question,
+        answer=entry.answer,
+        aliases=list(entry.aliases),
+        keywords=list(entry.keywords),
+        actions=list(entry.actions),
+    )
+
+
 def load_kb(kb_dir: Path) -> list[KbEntry]:
     """Walk `kb_dir` and load every .jsonl file.
 
@@ -112,8 +126,15 @@ def load_kb(kb_dir: Path) -> list[KbEntry]:
                     )
                     continue
                 if entry.id in seen_ids:
-                    print(f"[kb] duplicate id {entry.id} in {path.name}:{n}")
-                    continue
+                    # Duplicate id — keep the entry but uniquify the id
+                    # with a numeric suffix so we don't silently drop
+                    # 20+ scraped chunks with colliding content-hashes.
+                    suffix = 2
+                    new_id = f"{entry.id}-{suffix}"
+                    while new_id in seen_ids:
+                        suffix += 1
+                        new_id = f"{entry.id}-{suffix}"
+                    entry = replace_id(entry, new_id)
                 seen_ids.add(entry.id)
                 entries.append(entry)
     return entries
