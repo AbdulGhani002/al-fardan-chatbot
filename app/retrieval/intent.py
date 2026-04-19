@@ -40,6 +40,22 @@ Intent = Literal[
     "auto_reinvest",
     "transfer_from_exchange",
     "otc_quote_validity",
+    # ─── Set 4 (wrong-intent / missing-info fixes, James 19 Apr) ─
+    "interest_calculation",
+    "whitelist_address",
+    "account_closure",
+    "early_repayment",
+    "validator_choice",
+    "security_incident",
+    # ─── Set 5 ──────────────────────────────────────────────────
+    "loan_extension",
+    "internal_transfer",
+    "interest_rate_change",
+    "staking_network_fees",
+    "custody_minimum_balance",
+    "otc_counterparty",
+    "api_key_management",
+    "staking_rewards_withdraw",
     "navigate_staking",
     "navigate_lending",
     "navigate_custody",
@@ -244,7 +260,12 @@ _TAX_REPORTING_RE = re.compile(
     r"how.*(report|declare).*(tax|irs|crs|fatca)|"
     r"do\s+you\s+provide\s+(a\s+)?(statement|report|tax|csv|export)|"
     r"tax\s+statement|tax\s+report|tax\s+documents|tax\s+purposes|"
-    r"report\s+to\s+(tax|the\s+tax|irs|hmrc|tax\s+authorit)"
+    r"report\s+to\s+(tax|the\s+tax|irs|hmrc|tax\s+authorit)|"
+    # James Set 4 gap — "are rewards taxed?" was falling through because
+    # we only matched "tax <noun>" and not "tax(ed|able)" as a single word.
+    r"(are|is)\s+(my\s+|the\s+)?(staking\s+|my\s+)?rewards?\s+(taxed|taxable)|"
+    r"(rewards?|income|yield|earnings?)\s+(taxed|taxable)|"
+    r"tax(able|ed|ation)\s+(on|of|for)\s+(staking|rewards?|income|yield|earnings)"
     r")\b",
     re.I,
 )
@@ -299,6 +320,9 @@ _STAKING_FEES_RE = re.compile(
 _STAKING_FREQUENCY_RE = re.compile(
     r"\b("
     r"how\s+(often|frequently)\s+(do\s+you\s+)?(pay|distribute)\s+(staking\s+)?rewards?|"
+    # "how often [are] rewards paid" — no "are" also works
+    r"how\s+(often|frequently)\s+(are\s+)?(staking\s+)?rewards?\s+(paid|distributed|credited)|"
+    r"how\s+(often|frequently)\s+(are\s+)?(staking\s+)?(paid|distributed|credited)|"
     r"when\s+(are|do)\s+(staking\s+)?rewards?\s+(paid|distributed|credited)|"
     r"(staking\s+)?rewards?\s+(paid|distributed|credited)\s+(daily|weekly|hourly)|"
     r"(staking\s+)?payout\s+(schedule|frequency|interval)|"
@@ -375,8 +399,10 @@ _TRANSFER_FROM_EXCHANGE_RE = re.compile(
     re.I,
 )
 
-# OTC quote validity / firm-vs-indicative + price lock. Routes away
-# from generic navigate_otc (which returns the generic OTC intro).
+# OTC quote validity / firm-vs-indicative + price lock + price-move-
+# during-settlement. Routes away from generic navigate_otc (which
+# returns the generic OTC intro) and also absorbs the "do you guarantee
+# the price?" variant from James Set 5.
 _OTC_QUOTE_VALIDITY_RE = re.compile(
     r"\b("
     r"how\s+long\s+is\s+(an?\s+|the\s+)?(otc\s+)?quote\s+valid|"
@@ -384,7 +410,194 @@ _OTC_QUOTE_VALIDITY_RE = re.compile(
     r"(lock|freeze|guarantee|secure)\s+(in\s+)?(the\s+|my\s+)?price|"
     r"(price|quote)\s+lock|"
     r"firm\s+(quote|price)|indicative\s+(quote|price)|"
-    r"can\s+i\s+lock\s+(in\s+)?(the\s+|my\s+)?price"
+    r"can\s+i\s+lock\s+(in\s+)?(the\s+|my\s+)?price|"
+    r"(do\s+you\s+|does\s+al.?fardan\s+)?guarantee\s+(the\s+|my\s+)?(otc\s+)?price|"
+    r"market\s+moves?\s+(during|before)\s+settlement|"
+    r"what\s+if\s+(the\s+)?(market|price)\s+moves?"
+    r")\b",
+    re.I,
+)
+
+# ═════════════════════════════════════════════════════════════════════
+#  James QA Sets 4 + 5 (13 more intents)
+# ═════════════════════════════════════════════════════════════════════
+
+# Interest calc — daily accrual / monthly charge vs fixed / variable.
+_INTEREST_CALCULATION_RE = re.compile(
+    r"\b("
+    r"how\s+is\s+(the\s+|my\s+)?(interest|profit|cost|murabaha)\s+(calculated|computed|accrued|charged|worked\s+out)|"
+    r"(daily|monthly|hourly|annually)\s+(interest|accrual|charge)|"
+    r"when\s+(is|does)\s+(the\s+|my\s+)?(interest|profit)\s+(charged|paid|accrue|accrued)|"
+    r"interest\s+(calculation|accrual|schedule)|"
+    r"(daily|monthly)\s+vs\s+(monthly|daily)"
+    r")\b",
+    re.I,
+)
+
+# Whitelist withdrawal addresses — must outrank generic withdraw_request
+# because the word "withdrawal" is in the question.
+_WHITELIST_ADDRESS_RE = re.compile(
+    r"\b("
+    r"(whitelist|whitelisting|white[\s-]listed?)\s+(a\s+|my\s+|an?\s+|new\s+)?(withdrawal\s+)?addresses?|"
+    r"(add|register)\s+(a\s+|new\s+|an?\s+)?(whitelist|whitelisted)\s+addresses?|"
+    r"(withdrawal\s+)?addresses?\s+whitelist|"
+    r"whitelist\s+(how\s+long|duration|cooldown)|"
+    r"approved\s+addresses?\s+list"
+    r")\b",
+    re.I,
+)
+
+# Close account + GDPR-style data deletion.
+_ACCOUNT_CLOSURE_RE = re.compile(
+    r"\b("
+    r"(close|delete|deactivate|cancel|terminate)\s+(my\s+|the\s+)?account|"
+    r"how\s+(do|to)\s+(i\s+)?(close|delete|deactivate|terminate)\s+(my\s+)?account|"
+    r"delete\s+(my\s+|all\s+)?(data|personal\s+data|information)|"
+    r"data\s+(deletion|retention|privacy|policy|erasure)|"
+    r"right\s+to\s+(be\s+forgotten|erasure|deletion)|"
+    r"gdpr\s+(request|rights?)"
+    r")\b",
+    re.I,
+)
+
+# Early loan repayment / prepayment penalty.
+_EARLY_REPAYMENT_RE = re.compile(
+    r"\b("
+    r"(repay|pay\s+(off|back))\s+(my\s+|the\s+)?loan\s+(early|earlier|ahead)|"
+    r"early\s+(repayment|loan\s+payment|loan\s+repayment|payoff)|"
+    r"prepay(ment)?\s+(penalty|fee|charge|cost)|"
+    r"(repay|pay\s+off)\s+early|"
+    r"pay\s+back\s+(my\s+)?loan\s+(early|before|ahead)"
+    r")\b",
+    re.I,
+)
+
+# Validator choice / selection.
+_VALIDATOR_CHOICE_RE = re.compile(
+    r"\b("
+    r"(choose|select|pick|specify|nominate)\s+(a\s+|my\s+|which\s+|the\s+)?validator|"
+    r"which\s+validator.*(stake|eth|sol|my)|"
+    r"can\s+i\s+(pick|select|choose|specify)\s+(a\s+|the\s+|my\s+)?validator|"
+    r"my\s+own\s+validator|"
+    r"validator\s+selection|"
+    r"byo\s+validator"
+    r")\b",
+    re.I,
+)
+
+# Security incident — user reports suspicious activity, panic wording.
+# Fires BEFORE contact_support / unauthorized_login because the user is
+# ALREADY in trouble and needs emergency steps, not a generic "talk to
+# a human" link.
+_SECURITY_INCIDENT_RE = re.compile(
+    r"\b("
+    r"suspicious\s+(activity|transaction|withdrawal|behavior|behaviour|action|stuff)|"
+    r"unauthori[sz]ed\s+(transaction|withdrawal|transfer|activity|charge)|"
+    # Allow natural "account is/was/has been hacked" phrasing, not just
+    # the strict "account hacked" adjacent form.
+    r"(my\s+)?account\s+(is\s+|was\s+|has\s+been\s+|got\s+|just\s+got\s+)?"
+    r"(compromised|hacked|breached|taken\s+over|stolen|drained|emptied)|"
+    r"i\s+(was|got|been|think\s+i('ve|\s+have)\s+been|feel\s+i('ve|\s+have)\s+been)\s+hacked|"
+    r"someone\s+(stole|took|drained|moved).*my\s+(funds|crypto|balance|assets?|btc|eth)|"
+    r"i\s+see\s+suspicious|"
+    r"(report|flag)\s+(a\s+)?(suspicious|unauthori[sz]ed|fraudulent)"
+    r")\b",
+    re.I,
+)
+
+# Loan extension / renewal.
+_LOAN_EXTENSION_RE = re.compile(
+    r"\b("
+    r"extend\s+(my\s+|the\s+)?loan(\s+(term|period|duration|length))?|"
+    r"(renew|roll[\s-]?over)\s+(my\s+|the\s+)?loan|"
+    r"loan\s+(extension|renewal|rollover|roll[\s-]?over)|"
+    r"can\s+i\s+extend\s+(my\s+)?loan"
+    r")\b",
+    re.I,
+)
+
+# Internal wallet-to-wallet transfer within Al-Fardan.
+_INTERNAL_TRANSFER_RE = re.compile(
+    r"\b("
+    # "transfer crypto between my (own) wallets" — tolerate "own"
+    r"(transfer|move|send)\s+(crypto|btc|eth|sol|funds|balance|assets?)\s+between\s+(my\s+)?(own\s+)?wallets?|"
+    r"transfer\s+between\s+(my\s+)?(own\s+)?wallets?|"
+    r"internal\s+transfer|"
+    r"wallet[\s-]to[\s-]wallet\s+transfer|"
+    r"move\s+(crypto|funds|balance).*between.*(my\s+)?(own\s+)?wallets?|"
+    r"transfer\s+within\s+al.?fardan"
+    r")\b",
+    re.I,
+)
+
+# Interest rate change after loan origination.
+_INTEREST_RATE_CHANGE_RE = re.compile(
+    r"\b("
+    # Tolerant of filler words between "rate" and the change verb.
+    r"(interest\s+|loan\s+)?rate(\s+\w+){0,5}\s+(change|changes|vary|varies|float|floats|adjust|adjusts|move|moves)|"
+    r"(can|does|will)\s+(my\s+|the\s+)?(interest\s+|loan\s+)?rate\s+(change|vary|float|adjust)|"
+    r"fixed\s+or\s+variable\s+rate|"
+    r"variable\s+or\s+fixed\s+rate|"
+    r"is\s+(my\s+|the\s+)?rate\s+(fixed|variable|floating)"
+    r")\b",
+    re.I,
+)
+
+# Who pays the staking network (gas) fees?
+_STAKING_NETWORK_FEES_RE = re.compile(
+    r"\b("
+    r"(network|gas|transaction)\s+fees?\s+(for|on|in|from|during)\s+staking|"
+    r"(who|does\s+al[\s-]?fardan|do\s+you)\s+pays?\s+(the\s+)?(gas|network|transaction)\s+(fees?|costs?)|"
+    r"network\s+costs?\s+(for|on)\s+stak|"
+    r"gas\s+costs?\s+(for|on)\s+stak"
+    r")\b",
+    re.I,
+)
+
+# Minimum balance for custody.
+_CUSTODY_MINIMUM_BALANCE_RE = re.compile(
+    r"\b("
+    r"minimum\s+balance\s+(for\s+|in\s+)?custody|"
+    r"custody\s+(minimum|min)\s+balance|"
+    r"minimum.*(custody|cold\s+storage|fireblocks)|"
+    r"(do\s+you|does\s+al[\s-]?fardan)\s+(require|have)\s+(a\s+)?minimum\s+balance|"
+    r"is\s+there\s+(a\s+)?minimum.*custody|"
+    r"what\s+if\s+my\s+balance\s+drops?"
+    r")\b",
+    re.I,
+)
+
+# Who is the OTC counterparty?
+_OTC_COUNTERPARTY_RE = re.compile(
+    r"\b("
+    r"who\s+is\s+(the\s+|my\s+)?(counterparty|counter[\s-]?party|principal|dealer)|"
+    r"counter[\s-]?party\s+(for|in|of|on)\s+(otc|my\s+trade|the\s+trade)|"
+    r"otc\s+counter[\s-]?party|"
+    r"(are|is)\s+you\s+(the\s+)?(counterparty|principal|dealer)|"
+    r"al[\s-]?fardan\s+(counterparty|principal|dealer)"
+    r")\b",
+    re.I,
+)
+
+# API key create / manage / revoke.
+_API_KEY_MANAGEMENT_RE = re.compile(
+    r"\b("
+    r"(create|generate|make|get|issue)\s+(an?\s+|new\s+|my\s+)?api\s+keys?|"
+    r"(delete|revoke|remove|cancel|rotate)\s+(an?\s+|my\s+|the\s+)?api\s+keys?|"
+    r"(manage|manages|managing)\s+(my\s+|the\s+)?api\s+keys?|"
+    r"how\s+(do|to)\s+(i\s+)?(create|generate|make|get|use)\s+(an?\s+)?api\s+key|"
+    r"api\s+key\s+(management|create|creation|delete|revoke|scope|scoping|permission)"
+    r")\b",
+    re.I,
+)
+
+# Withdraw staking rewards specifically (must outrank generic withdraw).
+_STAKING_REWARDS_WITHDRAW_RE = re.compile(
+    r"\b("
+    r"withdraw\s+(my\s+)?(staking\s+)?rewards?(\s+anytime)?|"
+    r"(pull|cash)\s+(out|down)\s+(my\s+)?(staking\s+)?rewards?|"
+    r"take\s+out\s+(my\s+)?(staking\s+)?rewards?|"
+    r"(staking\s+)?rewards?\s+(withdraw|withdrawal)"
     r")\b",
     re.I,
 )
@@ -418,6 +631,22 @@ def classify(text: str) -> Intent:
         return "navigate_staking"
     if _START_LOAN_RE.search(text):
         return "navigate_lending"
+    # These three MUST fire BEFORE _START_WITHDRAW_RE so that the words
+    # "withdraw" / "wallet" don't hijack a specific question about:
+    #   - whitelisting (which mentions "withdrawal addresses")
+    #   - internal transfers (which mentions "wallets")
+    #   - withdrawing staking rewards specifically
+    if _WHITELIST_ADDRESS_RE.search(text):
+        return "whitelist_address"
+    if _INTERNAL_TRANSFER_RE.search(text):
+        return "internal_transfer"
+    if _STAKING_REWARDS_WITHDRAW_RE.search(text):
+        return "staking_rewards_withdraw"
+    # Security incident must outrank every nav — "my account is hacked"
+    # shouldn't just drop the user on /settings, they need the
+    # emergency flow.
+    if _SECURITY_INCIDENT_RE.search(text):
+        return "security_incident"
     if _START_WITHDRAW_RE.search(text):
         return "withdraw_request"
     # transfer_from_exchange must outrank the plain deposit_request
@@ -432,6 +661,11 @@ def classify(text: str) -> Intent:
         return "navigate_portfolio"
     if _GOTO_OTC_RE.search(text):
         return "navigate_otc"
+    # custody_minimum_balance must outrank _GOTO_CUSTODY_RE — "minimum
+    # balance for custody" contains "custody" and would otherwise get
+    # the generic navigate_custody reply instead of the specific answer.
+    if _CUSTODY_MINIMUM_BALANCE_RE.search(text):
+        return "custody_minimum_balance"
     if _GOTO_CUSTODY_RE.search(text):
         return "navigate_custody"
     if _GOTO_SETTINGS_RE.search(text):
@@ -475,6 +709,10 @@ def classify(text: str) -> Intent:
         return "tax_reporting"
     if _SLASHING_RE.search(text):
         return "slashing_question"
+    # "Network fees for staking" must outrank staking_fees — it's a
+    # distinct question about who pays gas, not about our commission.
+    if _STAKING_NETWORK_FEES_RE.search(text):
+        return "staking_network_fees"
     if _STAKING_FEES_RE.search(text):
         return "staking_fees"
     if _STAKING_FREQUENCY_RE.search(text):
@@ -492,6 +730,27 @@ def classify(text: str) -> Intent:
         return "auto_reinvest"
     if _OTC_QUOTE_VALIDITY_RE.search(text):
         return "otc_quote_validity"
+    # ─── Set 4 + 5 specifics — must beat generic loan_question /
+    #     staking_question which would otherwise shadow these.
+    if _EARLY_REPAYMENT_RE.search(text):
+        return "early_repayment"
+    if _LOAN_EXTENSION_RE.search(text):
+        return "loan_extension"
+    if _INTEREST_RATE_CHANGE_RE.search(text):
+        return "interest_rate_change"
+    if _INTEREST_CALCULATION_RE.search(text):
+        return "interest_calculation"
+    if _VALIDATOR_CHOICE_RE.search(text):
+        return "validator_choice"
+    # staking_network_fees + custody_minimum_balance already fire
+    # earlier (above the generic nav routes), so we don't need to
+    # re-check them here.
+    if _ACCOUNT_CLOSURE_RE.search(text):
+        return "account_closure"
+    if _OTC_COUNTERPARTY_RE.search(text):
+        return "otc_counterparty"
+    if _API_KEY_MANAGEMENT_RE.search(text):
+        return "api_key_management"
     if _LOAN_Q_RE.search(text):
         return "loan_question"
     if _STAKING_Q_RE.search(text):
@@ -682,10 +941,11 @@ def scripted_reply(intent: Intent) -> str | None:
             "To file an insurance claim: (1) email claims@alfardanq9.com with "
             "your account details and the transaction hash or incident "
             "summary, or (2) call our 24/7 emergency line at +971 4 123 4568. "
-            "Our claims team acknowledges within 2 UAE business hours and "
-            "opens a case with the Lloyd's of London syndicate directly. "
-            "Would you like me to connect you with a human on the claims "
-            "team right now?"
+            "Our claims team acknowledges within 2 UAE business hours; full "
+            "Lloyd's syndicate processing typically takes 60 to 90 days from "
+            "the date all required documents are submitted. Required: account "
+            "details, the transaction hash, and any supporting evidence. "
+            "Would you like me to connect you with the claims team right now?"
         )
     if intent == "auto_reinvest":
         return (
@@ -718,6 +978,141 @@ def scripted_reply(intent: Intent) -> str | None:
             "convert it to a firm quote at the current mid plus our spread, "
             "then you have 15 minutes to accept. Would you like me to "
             "connect you with Layla on the OTC desk for a firm quote?"
+        )
+    # ─── Set 4 replies ───────────────────────────────────────────
+    if intent == "interest_calculation":
+        return (
+            "Interest accrues daily on your outstanding loan balance and is "
+            "charged monthly. The Murabaha cost is pre-calculated at signing "
+            "and fixed for the full term — so total cost is known day one. "
+            "You can see your accrued interest live in the Lending module of "
+            "your dashboard. Would you like me to calculate the interest for "
+            "a specific loan amount?"
+        )
+    if intent == "whitelist_address":
+        return (
+            "Yes — you can whitelist withdrawal addresses in Settings → "
+            "Security → Whitelisted Addresses. Adding a new address enters a "
+            "24-hour cooldown before it becomes active — this is a security "
+            "measure that prevents an attacker from adding their own address "
+            "and withdrawing immediately. You can whitelist up to 20 "
+            "addresses per asset. Would you like me to guide you through "
+            "adding one?"
+        )
+    if intent == "account_closure":
+        return (
+            "Yes, you can close your account once balances are zero and any "
+            "active loans / staking positions are settled. Email "
+            "support@alfardanq9.com to request closure and we'll process it "
+            "within 3 UAE business days. Data retention: most personal data "
+            "is deleted on closure, but transaction records are retained for "
+            "5-7 years per UAE AML regulations. Would you like me to send "
+            "you our full data retention policy?"
+        )
+    if intent == "early_repayment":
+        return (
+            "Yes, you can repay your loan early at any time — there is no "
+            "prepayment penalty. Interest is calculated pro-rata for the "
+            "actual duration of the loan, so you save on the remaining "
+            "scheduled cost. Full repayment releases all collateral back to "
+            "your custody vault within 24 hours. Would you like me to "
+            "calculate your current payoff amount?"
+        )
+    if intent == "validator_choice":
+        return (
+            "No, you cannot select a specific validator. Our institutional "
+            "staking team runs a proprietary validator fleet chosen for "
+            "maximum uptime (99.95% SLA), security, and our slashing-"
+            "protection guarantee. For clients staking above $5M per network "
+            "we can discuss dedicated validator routing with your "
+            "relationship manager. Would you like me to explain how our "
+            "validator selection process works?"
+        )
+    if intent == "security_incident":
+        return (
+            "I hear you — this is urgent. Take these steps immediately: "
+            "(1) change your password in Settings → Security, (2) revoke any "
+            "API keys you don't recognise, (3) enable 2FA if it isn't "
+            "already, (4) email security@alfardanq9.com or call our 24/7 "
+            "emergency line at +971 4 123 4568 right now. Please do NOT "
+            "dismiss any unfamiliar alerts. Would you like me to connect you "
+            "with the security team this minute?"
+        )
+    # ─── Set 5 replies ───────────────────────────────────────────
+    if intent == "loan_extension":
+        return (
+            "Yes, you can extend your loan term. Contact your relationship "
+            "manager at least 30 days before maturity — extension terms are "
+            "re-priced at current rates against current collateral valuation. "
+            "No extension fee, but the new-term Murabaha cost applies from "
+            "the extension date forward. Would you like me to connect you "
+            "with your relationship manager to start the conversation?"
+        )
+    if intent == "internal_transfer":
+        return (
+            "Yes, you can transfer crypto between your own wallets instantly "
+            "and for free. Go to Wallets → Transfer, select the source "
+            "wallet, the destination wallet, the asset, and the amount. "
+            "Confirm with 2FA and the transfer executes on the backend — no "
+            "on-chain gas, no admin review. Would you like me to guide you "
+            "through the process?"
+        )
+    if intent == "interest_rate_change":
+        return (
+            "No — your interest rate is fixed at loan origination and does "
+            "not change during the term. The Murabaha structure we use "
+            "locks the total cost at signing, so even if market rates move, "
+            "your rate stays where it was. Would you like me to provide a "
+            "fixed-rate quote for a new loan?"
+        )
+    if intent == "staking_network_fees":
+        return (
+            "We cover all network gas and transaction costs for staking — "
+            "you pay zero network fees on stake, unstake, or reward claims. "
+            "The APY shown on our Staking page is already NET of both our "
+            "15% commission and the network fees, so what you see is what "
+            "you earn. Would you like me to explain how our fee structure "
+            "works for a specific network?"
+        )
+    if intent == "custody_minimum_balance":
+        return (
+            "No, there is no minimum balance for custody. You can hold any "
+            "amount — large or small — in your segregated Fireblocks vault, "
+            "with no monthly or per-asset fee. If your balance drops, "
+            "nothing changes: your assets stay fully insured under our "
+            "Lloyd's of London policy. The $100K minimum you may have seen "
+            "applies to institutional staking / OTC, not to custody itself. "
+            "Would you like me to explain our custody fee structure?"
+        )
+    if intent == "otc_counterparty":
+        return (
+            "Al-Fardan Q9 acts as the principal counterparty on every OTC "
+            "trade — your agreement is with us directly, not with the third-"
+            "party liquidity providers we source from in the background. "
+            "That gives you a single point of contact, one settlement leg, "
+            "and one legal entity on the other side of the deal. Would you "
+            "like me to connect you with Layla for a firm quote?"
+        )
+    if intent == "api_key_management":
+        return (
+            "Yes, you can create and revoke API keys yourself. Go to "
+            "Settings → API Keys → Create Key. Pick the scope (read-only, "
+            "trade, or withdraw), give it a label, and copy the secret "
+            "immediately — it is shown only once. To delete, click 'Revoke' "
+            "next to any key and it dies instantly. For $1M+ AUM clients "
+            "we also support IP-scoped keys and HMAC-SHA256 request signing. "
+            "Would you like me to guide you through creating your first key?"
+        )
+    if intent == "staking_rewards_withdraw":
+        return (
+            "Yes, you can withdraw your staking rewards at any time. Go to "
+            "Wallets → Withdraw, select the asset (ETH / SOL), enter the "
+            "destination address and amount, and confirm with 2FA. Admin "
+            "review completes within 1 hour during UAE business hours; "
+            "Fireblocks broadcasts the transaction after approval. No "
+            "lock-up beyond each network's standard unbonding (ETH ~27h, "
+            "SOL ~2d) if you're withdrawing freshly-unstaked principal. "
+            "Would you like me to help you submit a withdrawal?"
         )
     if intent == "deposit_request":
         return (
@@ -853,6 +1248,22 @@ _INTENT_TO_MATCH_TYPE = {
     "auto_reinvest": "intent_auto_reinvest",
     "transfer_from_exchange": "intent_transfer_from_exchange",
     "otc_quote_validity": "intent_otc_quote_validity",
+    # Set 4
+    "interest_calculation": "intent_interest_calculation",
+    "whitelist_address": "intent_whitelist_address",
+    "account_closure": "intent_account_closure",
+    "early_repayment": "intent_early_repayment",
+    "validator_choice": "intent_validator_choice",
+    "security_incident": "intent_security_incident",
+    # Set 5
+    "loan_extension": "intent_loan_extension",
+    "internal_transfer": "intent_internal_transfer",
+    "interest_rate_change": "intent_interest_rate_change",
+    "staking_network_fees": "intent_staking_network_fees",
+    "custody_minimum_balance": "intent_custody_minimum_balance",
+    "otc_counterparty": "intent_otc_counterparty",
+    "api_key_management": "intent_api_key_management",
+    "staking_rewards_withdraw": "intent_staking_rewards_withdraw",
     # Short yes/no — map to generic intent types so the widget can
     # still render actions the usual way.
     "affirmation": "intent_affirmation",

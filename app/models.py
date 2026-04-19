@@ -64,6 +64,22 @@ MatchType = Literal[
     "intent_auto_reinvest",
     "intent_transfer_from_exchange",
     "intent_otc_quote_validity",
+    # Set 4
+    "intent_interest_calculation",
+    "intent_whitelist_address",
+    "intent_account_closure",
+    "intent_early_repayment",
+    "intent_validator_choice",
+    "intent_security_incident",
+    # Set 5
+    "intent_loan_extension",
+    "intent_internal_transfer",
+    "intent_interest_rate_change",
+    "intent_staking_network_fees",
+    "intent_custody_minimum_balance",
+    "intent_otc_counterparty",
+    "intent_api_key_management",
+    "intent_staking_rewards_withdraw",
     "system_error",
 ]
 
