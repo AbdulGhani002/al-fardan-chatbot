@@ -37,6 +37,9 @@ Intent = Literal[
     "staking_frequency",
     "unauthorized_login",
     "insurance_claim",
+    "auto_reinvest",
+    "transfer_from_exchange",
+    "otc_quote_validity",
     "navigate_staking",
     "navigate_lending",
     "navigate_custody",
@@ -334,6 +337,58 @@ _INSURANCE_CLAIM_RE = re.compile(
     re.I,
 )
 
+# ─── Staking sub-topics part 3 (James QA, Set 3) ─────────────────────
+
+# Auto-reinvest / compounding — user wants to know if rewards compound
+# automatically. Routes to a dedicated scripted reply so we don't get
+# mis-routed to "which network would you like to stake?" again.
+_AUTO_REINVEST_RE = re.compile(
+    r"\b("
+    r"auto[\s-]?(re[\s-]?invest|compound|compounding|stake|staking)|"
+    r"automatic(ally)?\s+(re[\s-]?invest|compound|compounding|restake|restaking)|"
+    r"automatic\s+(re[\s-]?invest|compound|compounding)|"
+    r"(re[\s-]?invest|restake)\s+(my\s+)?(staking\s+)?rewards?\s+(automatic|by\s+default)|"
+    r"compound\s+(my\s+)?(staking\s+)?rewards?|"
+    r"compound(ing)?\s+interest|"
+    r"re[\s-]?invest\s+(my\s+)?rewards?"
+    r")\b",
+    re.I,
+)
+
+# Transferring from another exchange (Binance, Coinbase, Kraken) into
+# custody. Distinct from the generic deposit_request because the user
+# explicitly has funds on another venue — the reply needs "copy our
+# deposit address + initiate a withdrawal on their side".
+_TRANSFER_FROM_EXCHANGE_RE = re.compile(
+    r"\b("
+    # "transfer from Binance", "move from Coinbase", "send from Kraken"
+    r"(transfer|move|send)(\s+(my\s+)?(crypto|btc|eth|sol|coins?|funds|assets?|balance))?\s+"
+    r"from\s+(another\s+)?(exchange|wallet|platform|"
+    r"binance|coinbase|kraken|bybit|okx|bitget|kucoin|bitfinex|ftx|gemini|crypto\.?com|"
+    r"bitstamp|huobi|mexc|bingx|upbit|coincheck|bitflyer)|"
+    # "deposit from Binance"
+    r"deposit\s+from\s+(another\s+)?(exchange|wallet|platform|"
+    r"binance|coinbase|kraken|bybit|okx|bitget|kucoin|gemini|crypto\.?com)|"
+    # "how do I transfer from …"
+    r"how\s+(do|to)\s+i?\s*(transfer|move|send|deposit)\s+from\s+(another\s+)?(exchange|wallet|platform|binance|coinbase|kraken)"
+    r")\b",
+    re.I,
+)
+
+# OTC quote validity / firm-vs-indicative + price lock. Routes away
+# from generic navigate_otc (which returns the generic OTC intro).
+_OTC_QUOTE_VALIDITY_RE = re.compile(
+    r"\b("
+    r"how\s+long\s+is\s+(an?\s+|the\s+)?(otc\s+)?quote\s+valid|"
+    r"(otc\s+)?quote\s+(valid(ity)?|expir|window|lock|lifetime)|"
+    r"(lock|freeze|guarantee|secure)\s+(in\s+)?(the\s+|my\s+)?price|"
+    r"(price|quote)\s+lock|"
+    r"firm\s+(quote|price)|indicative\s+(quote|price)|"
+    r"can\s+i\s+lock\s+(in\s+)?(the\s+|my\s+)?price"
+    r")\b",
+    re.I,
+)
+
 
 def classify(text: str) -> Intent:
     """Return the most specific matching intent or 'unknown'.
@@ -365,6 +420,12 @@ def classify(text: str) -> Intent:
         return "navigate_lending"
     if _START_WITHDRAW_RE.search(text):
         return "withdraw_request"
+    # transfer_from_exchange must outrank the plain deposit_request
+    # because "deposit from Binance" is a FROM-exchange question that
+    # needs the detailed reply (copy address + withdraw on their side
+    # + send a test amount), not the generic deposit blurb.
+    if _TRANSFER_FROM_EXCHANGE_RE.search(text):
+        return "transfer_from_exchange"
     if _START_DEPOSIT_RE.search(text):
         return "deposit_request"
     if _GOTO_PORTFOLIO_RE.search(text):
@@ -422,6 +483,15 @@ def classify(text: str) -> Intent:
         return "unauthorized_login"
     if _INSURANCE_CLAIM_RE.search(text):
         return "insurance_claim"
+    # Set 3 (auto-reinvest / quote-validity) — must fire BEFORE the
+    # generic topic routes so we don't answer "can I auto-reinvest?"
+    # with "which network would you like to stake?" (James's Set 3 QA).
+    # transfer_from_exchange is already handled earlier in the action
+    # block so it outranks the plain deposit_request.
+    if _AUTO_REINVEST_RE.search(text):
+        return "auto_reinvest"
+    if _OTC_QUOTE_VALIDITY_RE.search(text):
+        return "otc_quote_validity"
     if _LOAN_Q_RE.search(text):
         return "loan_question"
     if _STAKING_Q_RE.search(text):
@@ -617,6 +687,38 @@ def scripted_reply(intent: Intent) -> str | None:
             "Would you like me to connect you with a human on the claims "
             "team right now?"
         )
+    if intent == "auto_reinvest":
+        return (
+            "Yes — automatic compounding is on by default. Your Ethereum "
+            "staking rewards compound directly into your staked principal "
+            "(no manual claim), and Solana rewards can auto-restake at each "
+            "epoch. This lifts your effective APY above the headline rate. "
+            "You can toggle auto-compounding off per position from your "
+            "dashboard if you prefer to take rewards as liquid balance. "
+            "Would you like me to walk you through configuring "
+            "auto-compounding for a specific network?"
+        )
+    if intent == "transfer_from_exchange":
+        return (
+            "To move crypto from another exchange into Al-Fardan Q9: (1) go "
+            "to Wallets → pick the asset → Deposit to see your unique "
+            "Fireblocks deposit address (and a QR code). (2) On the other "
+            "exchange, initiate a withdrawal to that exact address on the "
+            "matching network (e.g. BTC mainnet, ETH ERC-20). (3) Send a "
+            "small test amount first — crypto transactions are irreversible. "
+            "Auto-credit happens after 3 on-chain confirmations. Would you "
+            "like me to walk you through this step by step?"
+        )
+    if intent == "otc_quote_validity":
+        return (
+            "A firm OTC quote is valid for 15 minutes — within that window "
+            "the price is locked, regardless of market movement. An "
+            "indicative quote is an estimate that isn't locked, meant for "
+            "sizing only. Once you're ready, you can ask the dealer to "
+            "convert it to a firm quote at the current mid plus our spread, "
+            "then you have 15 minutes to accept. Would you like me to "
+            "connect you with Layla on the OTC desk for a firm quote?"
+        )
     if intent == "deposit_request":
         return (
             "Deposits: go to Wallets → pick your asset → copy the deposit address "
@@ -748,6 +850,9 @@ _INTENT_TO_MATCH_TYPE = {
     "staking_frequency": "intent_staking_frequency",
     "unauthorized_login": "intent_unauthorized_login",
     "insurance_claim": "intent_insurance_claim",
+    "auto_reinvest": "intent_auto_reinvest",
+    "transfer_from_exchange": "intent_transfer_from_exchange",
+    "otc_quote_validity": "intent_otc_quote_validity",
     # Short yes/no — map to generic intent types so the widget can
     # still render actions the usual way.
     "affirmation": "intent_affirmation",

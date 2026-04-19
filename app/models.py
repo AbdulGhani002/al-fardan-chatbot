@@ -61,6 +61,9 @@ MatchType = Literal[
     "intent_staking_frequency",
     "intent_unauthorized_login",
     "intent_insurance_claim",
+    "intent_auto_reinvest",
+    "intent_transfer_from_exchange",
+    "intent_otc_quote_validity",
     "system_error",
 ]
 
