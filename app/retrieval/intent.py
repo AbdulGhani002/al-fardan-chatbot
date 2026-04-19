@@ -214,8 +214,12 @@ _START_WITHDRAW_RE = re.compile(
 )
 _START_DEPOSIT_RE = re.compile(
     r"\b(deposit|fund\s+my\s+account|top\s+up|add\s+crypto|"
-    r"send\s+(you|crypto\s+to\s+you)|how\s+(do|to)\s+deposit|"
-    r"deposit\s+address|where\s+to\s+send)\b",
+    # Scoped "send ... to you" only when the user is clearly talking
+    # about crypto/funds — not "send you my passport" (James QA).
+    r"send\s+(crypto|btc|eth|sol|usdt|usdc|funds|assets?|coins?|tokens?)\s+to\s+you|"
+    r"how\s+(do|to)\s+deposit|"
+    r"deposit\s+address|"
+    r"where\s+to\s+send\s+(my\s+|the\s+)?(crypto|btc|eth|sol|funds|usdt|usdc|coins?|tokens?|assets?))\b",
     re.I,
 )
 _GOTO_CUSTODY_RE = re.compile(
