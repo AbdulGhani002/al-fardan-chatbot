@@ -1386,6 +1386,54 @@ def classify(text: str) -> Intent:
     return "unknown"
 
 
+# ─── Intents migrated to KB (app/data/kb/20_intent_migrations.jsonl)
+#
+# These info-only intents used to have hardcoded scripted replies in
+# this file — one `if intent == "..."` branch each. Every round of QA
+# feedback forced me to patch the regex classifier to catch new user
+# phrasings, producing the "intent whack-a-mole" pattern James flagged.
+#
+# The fix is to treat answers as DATA, not code:
+#   - Each former intent now has a KB entry with rich aliases covering
+#     every phrasing we've seen.
+#   - The classify() regex still fires (harmless — it just returns an
+#     intent name). `scripted_reply()` returns None for these, so we
+#     fall through to the composer → semantic retriever → KB hit.
+#   - The semantic retriever catches paraphrases automatically — new
+#     wordings don't need new regex.
+#
+# Adding new Q&A coverage is now a KB edit (JSONL file), not a code
+# change. The bot gets smarter by data, not by more `if` branches.
+#
+# KEEP intent + scripted_reply for action/navigation intents that need
+# to render specific CRM buttons (navigate_*, withdraw_request,
+# deposit_request, transfer_from_exchange, signup, balance_check,
+# contact_support, greeting, goodbye, affirmation, negation,
+# security_incident).
+_MIGRATED_TO_KB: set[str] = {
+    "slashing_question", "tax_reporting", "network_outage",
+    "withdrawal_delay", "staking_fees", "staking_frequency",
+    "unauthorized_login", "insurance_claim", "auto_reinvest",
+    "otc_quote_validity", "interest_calculation", "whitelist_address",
+    "account_closure", "early_repayment", "validator_choice",
+    "loan_extension", "internal_transfer", "interest_rate_change",
+    "staking_network_fees", "custody_minimum_balance",
+    "otc_counterparty", "api_key_management", "staking_rewards_withdraw",
+    "ltv_calculation", "rewards_history", "session_timeout",
+    "claim_rewards", "interest_payment", "shared_account", "cancel_otc",
+    "otc_max_size", "tin_required", "add_collateral", "ip_whitelisting",
+    "negotiate_rate", "loan_default", "validator_diversification",
+    "monthly_statements", "liquidation_details", "partial_repayment",
+    "hardware_wallet", "rewards_in_different_asset", "missing_rewards",
+    "user_to_user_transfer", "otc_after_hours", "login_history",
+    "interest_source", "rewards_expiration", "withdrawal_time",
+    "active_sessions", "loan_transfer", "validator_locations",
+    "historical_snapshot", "otc_settlement_currency",
+    "temporary_deactivation", "collateral_revaluation",
+    "tax_withholding", "account_recovery",
+}
+
+
 # ─── Scripted replies + action buttons per intent ────────────────────
 
 def scripted_reply(intent: Intent) -> str | None:
@@ -1397,8 +1445,17 @@ def scripted_reply(intent: Intent) -> str | None:
     exact same thing every time.
 
     Returns None for intents where we fall through to KB retrieval
-    instead (loan_question, staking_question, unknown).
+    instead (loan_question, staking_question, unknown, and every
+    intent listed in _MIGRATED_TO_KB below).
     """
+    # Intents whose answers moved to KB entries in 20_intent_migrations
+    # .jsonl — the semantic retriever handles them now. Adding new Q&A
+    # coverage is a KB edit, not a code change. DO NOT add info-only
+    # intents back to this file; extend the KB entry's `aliases` list
+    # instead so the retriever picks up new phrasings.
+    if intent in _MIGRATED_TO_KB:
+        return None
+
     # Try the variant pool first — gives the bot human-sounding variety
     from ..refine.vary import pick_variant  # local import to avoid cycles
     varied = pick_variant(intent)
@@ -2143,6 +2200,12 @@ def scripted_actions(intent: Intent) -> list[dict] | None:
     These deep-link into the CRM's routes. The widget renders them as
     clickable chips beneath the bot's message.
     """
+    # Migrated intents' buttons come from their KB entry's `actions`
+    # field (main.py's `_actions_for_entry` picks those up). Returning
+    # None here means no scripted-action override — retrieval wins.
+    if intent in _MIGRATED_TO_KB:
+        return None
+
     # URL map — these are the ACTUAL CRM routes. Keep this table as
     # the single source of truth; do not invent new paths here without
     # confirming the page exists at src/app/<path>/page.tsx in the CRM.
