@@ -263,9 +263,21 @@ _STAKING_Q_RE = re.compile(
     re.I,
 )
 _CONTACT_RE = re.compile(
-    r"\b(talk\s+to\s+(a\s+)?human|speak\s+to\s+(someone|a\s+person|a\s+human)|"
-    r"human\s+support|real\s+person|customer\s+service|phone\s+support|"
-    r"call\s+support|i\s+need\s+help\s+from\s+a\s+human|escalate)\b",
+    r"\b("
+    # Explicit requests for a human
+    r"talk\s+to\s+(a\s+)?(human|someone|a\s+person|an?\s+agent|support|the\s+team)|"
+    r"speak\s+to\s+(someone|a\s+person|a\s+human|an?\s+agent|support|the\s+team)|"
+    r"chat\s+with\s+(someone|a\s+person|a\s+human|an?\s+agent|support|the\s+team)|"
+    r"human\s+support|real\s+person|customer\s+(service|support)|phone\s+support|"
+    r"call\s+support|i\s+need\s+help\s+from\s+a\s+human|escalate|"
+    # Generic "I'm stuck / need help" — user wants assistance, not
+    # necessarily an agent but the reply covers it.
+    r"(i\s+)?(get|got|am|'m|feel)\s+stuck|"
+    r"need\s+help(\s+with)?|"
+    r"contact\s+(support|the\s+team|someone)|"
+    r"(is\s+there|anyone|anybody)\s+(a\s+|an\s+)?(person|human|someone|agent).*\b(speak|talk|chat|help)|"
+    r"(speak|talk|chat|help)\s+(to|with)\s+(someone|anyone|a\s+human|a\s+person)"
+    r")\b",
     re.I,
 )
 
