@@ -50,6 +50,17 @@ MatchType = Literal[
     "intent_deposit",
     "intent_affirmation",
     "intent_negation",
+    # Specific staking sub-topics added post-QA — each has a bespoke
+    # scripted reply so "what is slashing?" no longer gets the generic
+    # "which network would you like to stake?" mis-routing.
+    "intent_slashing",
+    "intent_tax_reporting",
+    "intent_network_outage",
+    "intent_withdrawal_delay",
+    "intent_staking_fees",
+    "intent_staking_frequency",
+    "intent_unauthorized_login",
+    "intent_insurance_claim",
     "system_error",
 ]
 

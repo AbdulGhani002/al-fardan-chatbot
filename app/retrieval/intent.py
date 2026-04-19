@@ -26,6 +26,17 @@ Intent = Literal[
     "balance_check",
     "loan_question",
     "staking_question",
+    # Specific staking sub-topics that MUST fire before the generic
+    # staking_question intent (which asks "which network?" and otherwise
+    # shadows real questions about slashing, tax reporting, outages).
+    "slashing_question",
+    "tax_reporting",
+    "network_outage",
+    "withdrawal_delay",
+    "staking_fees",
+    "staking_frequency",
+    "unauthorized_login",
+    "insurance_claim",
     "navigate_staking",
     "navigate_lending",
     "navigate_custody",
@@ -200,6 +211,129 @@ _CONTACT_RE = re.compile(
     re.I,
 )
 
+# ─── Specific staking sub-topics that must outrank staking_question ──
+# Each of these needs a dedicated answer. If we fall through to
+# staking_question the bot just asks "which network would you like to
+# stake?" — which is the wrong reply for all of these.
+
+_SLASHING_RE = re.compile(
+    r"\b("
+    r"slashing|slashed|"
+    # "validator penalty", "validator misbehav…", "validator gets penalized",
+    # "validator will be punished", etc — allow a few filler words so
+    # natural phrasings still land on this intent rather than falling
+    # through to staking_question. `\w*` on each keyword consumes the
+    # full word so the trailing `\b` in the outer group matches.
+    r"validator(\s+\w+){0,3}\s+(penalt\w*|penaliz\w*|misbehav\w*|punish\w*|slash\w*)|"
+    r"(penalt\w*|penaliz\w*|punish\w*)(\s+\w+){0,3}\s+validator|"
+    r"lose\s+(my\s+)?(staked|stake|assets)|"
+    r"losing\s+(my\s+)?(stake|staked|assets)|"
+    r"risk\s+(of\s+)?(losing|loss).*(stake|staked)|"
+    r"slashing\s+protection"
+    r")\b",
+    re.I,
+)
+_TAX_REPORTING_RE = re.compile(
+    r"\b("
+    r"tax\s+(document|report|statement|form|season|purpose|year)|"
+    r"tax\s+(filing|return|preparation|advisor|adviser|authority|authorities)|"
+    r"(report|declare)\s+(my\s+)?(staking|rewards|yield|income|earnings)|"
+    r"how.*(report|declare).*(tax|irs|crs|fatca)|"
+    r"do\s+you\s+provide\s+(a\s+)?(statement|report|tax|csv|export)|"
+    r"tax\s+statement|tax\s+report|tax\s+documents|tax\s+purposes|"
+    r"report\s+to\s+(tax|the\s+tax|irs|hmrc|tax\s+authorit)"
+    r")\b",
+    re.I,
+)
+# "Network outage" — user is asking about blockchain or platform
+# availability, NOT trying to access balances. Distinct from a
+# balance_check because the framing is about the chain itself going
+# down or funds being inaccessible during an incident.
+_NETWORK_OUTAGE_RE = re.compile(
+    r"\b("
+    r"(ethereum|eth|solana|sol|bitcoin|btc|polygon|polkadot|dot|avalanche|avax|"
+    r"cosmos|atom|blockchain|network|chain)\s+(goes?\s+down|went\s+down|"
+    r"is\s+down|outage|offline|unavailable|halted|stopped|crashed|crash|"
+    r"is\s+experiencing|has\s+issues)|"
+    r"(network|blockchain|chain|validator)\s+(outage|down|offline|unavailable|halt|incident)|"
+    r"what\s+(if|happens\s+when)\s+(the\s+)?(network|blockchain|chain|"
+    r"ethereum|solana|bitcoin).*(down|outage|offline|stop|halt|fail)|"
+    r"can(no|')?t\s+access\s+(my\s+)?(funds|account|assets|money)"
+    r")\b",
+    re.I,
+)
+# "My withdrawal is pending / stuck / taking forever" — the user
+# already submitted and is anxious. We want to acknowledge the delay
+# before offering the standard troubleshooting prompt.
+_WITHDRAWAL_DELAY_RE = re.compile(
+    r"\b("
+    r"(my\s+)?withdrawal\s+(is\s+)?(pending|stuck|delayed|taking\s+(too\s+)?long|"
+    r"still\s+pending|not\s+(processed|done|complete)|"
+    r"been\s+(pending|waiting|sitting|stuck))|"
+    r"withdrawal\s+.*\b\d+\s*(hour|hr|day|minute|min)s?\b|"
+    r"(pending|waiting|stuck)\s+(for|since)\s+\d+\s*(hour|hr|day|minute|min)|"
+    r"waiting.*withdraw|withdraw.*still\s+waiting|"
+    r"whats?\s+(wrong|happening|up)\s+with\s+my\s+withdraw"
+    r")\b",
+    re.I,
+)
+
+# ─── Staking sub-topics part 2 (James QA, 19 Apr) ────────────────────
+
+# Fees / commission on staking — "what's the fee?", "do you take a cut?"
+_STAKING_FEES_RE = re.compile(
+    r"\b("
+    r"(fee|fees|commission|charge|cost|cut|percentage)\s+(for|on|from|off)\s+(staking|rewards?|validator)|"
+    r"(staking|validator)\s+(fee|fees|commission|charge|cost)|"
+    r"how\s+much\s+do\s+you\s+(charge|take|keep)\s+(for|from|on|off)\s+(staking|rewards?)|"
+    r"do\s+you\s+(take|keep|charge)\s+(a\s+)?(percentage|cut|commission|fee)\s+(of|from|on|off)\s+(my\s+)?rewards?|"
+    r"validator\s+commission|percent\s+of\s+rewards?"
+    r")\b",
+    re.I,
+)
+
+# Frequency / schedule of staking payouts
+_STAKING_FREQUENCY_RE = re.compile(
+    r"\b("
+    r"how\s+(often|frequently)\s+(do\s+you\s+)?(pay|distribute)\s+(staking\s+)?rewards?|"
+    r"when\s+(are|do)\s+(staking\s+)?rewards?\s+(paid|distributed|credited)|"
+    r"(staking\s+)?rewards?\s+(paid|distributed|credited)\s+(daily|weekly|hourly)|"
+    r"(staking\s+)?payout\s+(schedule|frequency|interval)|"
+    r"rewards?\s+(schedule|frequency|interval)|"
+    r"daily\s+or\s+weekly|hourly\s+or\s+daily"
+    r")\b",
+    re.I,
+)
+
+# Unauthorized / suspicious login — user is asking about security, not
+# reporting an incident (incidents should route to contact_support).
+_UNAUTHORIZED_LOGIN_RE = re.compile(
+    r"\b("
+    r"(someone|somebody|hacker)\s+(tries?|tried|attempts?|attempted|logs?|logged|logging)\s+"
+    r"(in|into)\s+(my\s+)?(account|portal|dashboard)|"
+    r"(unauthori[sz]ed|suspicious)\s+(login|access|sign[\s-]?in|attempt|activity)|"
+    r"login\s+from\s+(another|different|unknown|unfamiliar|foreign)\s+(country|location|ip|device|place)|"
+    r"sign[\s-]?in\s+from\s+(another|different|unknown|unfamiliar|foreign)\s+(country|location|ip|device)|"
+    r"what\s+(if|happens).*(someone|hacker|attacker).*(log|sign)|"
+    r"protect.*against.*(unauthori[sz]ed|account\s+takeover)|"
+    r"detect.*suspicious\s+(login|sign[\s-]?in|activity)"
+    r")\b",
+    re.I,
+)
+
+# How to file an insurance claim — user is asking PROCESS, not policy
+# details. If matched, we route to a dedicated scripted reply that
+# includes the claim email + phone + needed info.
+_INSURANCE_CLAIM_RE = re.compile(
+    r"\b("
+    r"(file|filing|submit|raise|make)\s+(an?\s+)?(insurance\s+)?claim|"
+    r"how\s+(do|to)\s+(i\s+)?(file|submit|raise|make)\s+(an?\s+)?(insurance\s+)?claim|"
+    r"claim\s+(process|procedure|steps|instructions)|"
+    r"insurance\s+claim\s+process"
+    r")\b",
+    re.I,
+)
+
 
 def classify(text: str) -> Intent:
     """Return the most specific matching intent or 'unknown'.
@@ -262,6 +396,32 @@ def classify(text: str) -> Intent:
     # ─── Info-question intents ────────────────────────────────────
     if _BALANCE_RE.search(text):
         return "balance_check"
+    # Withdrawal-delay check comes BEFORE withdraw_request navigation
+    # because phrases like "my withdrawal is pending" shouldn't be
+    # re-routed to "Open Wallets" — the user wants status, not a link.
+    # Moved here to win over navigate_* if somehow both matched, but
+    # in practice the regex is specific enough to not overlap.
+    if _WITHDRAWAL_DELAY_RE.search(text):
+        return "withdrawal_delay"
+    # These MUST fire BEFORE staking_question / loan_question —
+    # otherwise "what is slashing?" / "what are your staking fees?" /
+    # "how often are rewards paid?" all get answered with "which
+    # network would you like to stake?" (mis-routes reported by
+    # James in two QA passes).
+    if _NETWORK_OUTAGE_RE.search(text):
+        return "network_outage"
+    if _TAX_REPORTING_RE.search(text):
+        return "tax_reporting"
+    if _SLASHING_RE.search(text):
+        return "slashing_question"
+    if _STAKING_FEES_RE.search(text):
+        return "staking_fees"
+    if _STAKING_FREQUENCY_RE.search(text):
+        return "staking_frequency"
+    if _UNAUTHORIZED_LOGIN_RE.search(text):
+        return "unauthorized_login"
+    if _INSURANCE_CLAIM_RE.search(text):
+        return "insurance_claim"
     if _LOAN_Q_RE.search(text):
         return "loan_question"
     if _STAKING_Q_RE.search(text):
@@ -333,8 +493,11 @@ def scripted_reply(intent: Intent) -> str | None:
     if intent == "navigate_lending":
         return (
             "Our lending is a Shariah-compliant Murabaha credit line backed by "
-            "your BTC or ETH. Starting from 3.25% APR for 5-year terms, min $25K "
-            "loan. Tap \"Open Lending\" to start an application or \"Loan "
+            "your BTC or ETH, with up to 75% LTV — among the highest in "
+            "institutional crypto lending. Rates start at 3.25% APR for 5-year "
+            "terms (min $25K). If the collateral price drops, you receive a "
+            "margin call at 85% LTV with 24 hours to top up or partially repay "
+            "before any liquidation. Tap \"Open Lending\" to start, or \"Loan "
             "Calculator\" to see what you qualify for first."
         )
     if intent == "navigate_custody":
@@ -345,9 +508,11 @@ def scripted_reply(intent: Intent) -> str | None:
         )
     if intent == "navigate_otc":
         return (
-            "Our OTC Desk handles block trades above USD 100K with tight spreads "
-            "(10-20 bps typical) and T+0 crypto / T+1 fiat settlement. Tap "
-            "\"Open OTC Desk\" to request a quote."
+            "Our OTC Desk handles block trades from USD 100,000 to USD 50M+. "
+            "Typical spreads are 5 to 25 bps depending on asset and size. "
+            "Crypto settlement completes within 1-4 hours; fiat wires within "
+            "24 hours — same-day crypto is standard. Tap \"Open OTC Desk\" to "
+            "request a firm quote."
         )
     if intent == "navigate_portfolio":
         return (
@@ -370,8 +535,87 @@ def scripted_reply(intent: Intent) -> str | None:
         return (
             "Withdrawals are initiated from your Wallets page. Enter the "
             "destination address and amount, confirm with 2FA — admin reviews "
-            "within 1 hour during UAE business hours. Tap \"Open Wallets\" below "
-            "to start a withdrawal."
+            "within 1 hour during UAE business hours. Typical processing: "
+            "1-4 hours for crypto, 24 hours for fiat wires. Tap \"Open Wallets\" "
+            "below to start a withdrawal."
+        )
+    if intent == "withdrawal_delay":
+        return (
+            "I understand your concern — let me help. Our typical processing "
+            "is 1 to 4 hours for crypto. Anything significantly longer may be "
+            "a compliance review or a temporary technical delay. Would you "
+            "please share the asset and withdrawal ID so I can check the "
+            "status for you? You can also reach our team directly at "
+            "institutional@alfardanq9.com — they can escalate if needed."
+        )
+    if intent == "slashing_question":
+        return (
+            "Slashing is a penalty imposed by proof-of-stake networks when "
+            "validators misbehave — typically through double-signing or "
+            "prolonged downtime. However, you do not lose your assets with us. "
+            "We maintain a dedicated slashing-protection reserve that fully "
+            "indemnifies clients against validator penalties; we have had zero "
+            "slashing events since inception. Would you like me to explain "
+            "how our slashing protection works in more detail?"
+        )
+    if intent == "tax_reporting":
+        return (
+            "We provide full transaction history in CSV format — you can "
+            "export your staking rewards, OTC trades, and loan cost records "
+            "directly from your dashboard (Settings → Statements). We do not "
+            "provide tax advice; tax treatment varies by jurisdiction and "
+            "personal circumstances, so we recommend consulting a qualified "
+            "tax adviser. Would you like me to walk you through exporting "
+            "your rewards report?"
+        )
+    if intent == "network_outage":
+        return (
+            "If the underlying blockchain experiences an outage, certain "
+            "operations — unstaking, on-chain transfers, withdrawals on that "
+            "network — are temporarily paused at the protocol level. However, "
+            "your assets remain safe in segregated Fireblocks MPC custody. "
+            "Full functionality resumes automatically once the network "
+            "recovers. Major outages are rare and historically resolved within "
+            "hours. Would you like me to explain our contingency procedures "
+            "in more detail?"
+        )
+    if intent == "staking_fees":
+        return (
+            "We take 15% of staking rewards only — your principal is never "
+            "touched. No lock-up fees, no withdrawal fees, no platform fees. "
+            "The published APY on every network is already NET of our "
+            "commission, so the rate you see is the rate you earn. Would you "
+            "like me to calculate your net yield for a specific network?"
+        )
+    if intent == "staking_frequency":
+        return (
+            "Staking rewards are paid daily. Every day at 00:00 UTC rewards "
+            "are automatically calculated and distributed to your segregated "
+            "custodial account — no manual claim required. For Ethereum "
+            "rewards auto-compound into your staked principal; Solana credits "
+            "as a separate balance. Would you like me to help you track your "
+            "rewards on a specific network?"
+        )
+    if intent == "unauthorized_login":
+        return (
+            "If someone attempts to sign in from an unrecognised device or "
+            "location, our system blocks the attempt and emails you a "
+            "security alert immediately. Every sensitive action "
+            "(withdrawals, settings changes, loan approvals) additionally "
+            "requires 2FA. We also offer withdrawal-address whitelisting "
+            "with a 24-hour cooldown to stop address-swap attacks. Would you "
+            "like me to walk you through enabling 2FA and reviewing your "
+            "security settings?"
+        )
+    if intent == "insurance_claim":
+        return (
+            "To file an insurance claim: (1) email claims@alfardanq9.com with "
+            "your account details and the transaction hash or incident "
+            "summary, or (2) call our 24/7 emergency line at +971 4 123 4568. "
+            "Our claims team acknowledges within 2 UAE business hours and "
+            "opens a case with the Lloyd's of London syndicate directly. "
+            "Would you like me to connect you with a human on the claims "
+            "team right now?"
         )
     if intent == "deposit_request":
         return (
@@ -495,6 +739,15 @@ _INTENT_TO_MATCH_TYPE = {
     "withdraw_request": "intent_withdraw",
     "deposit_request": "intent_deposit",
     "contact_support": "intent_contact_support",
+    # Specific staking sub-topics added after James's QA passes.
+    "slashing_question": "intent_slashing",
+    "tax_reporting": "intent_tax_reporting",
+    "network_outage": "intent_network_outage",
+    "withdrawal_delay": "intent_withdrawal_delay",
+    "staking_fees": "intent_staking_fees",
+    "staking_frequency": "intent_staking_frequency",
+    "unauthorized_login": "intent_unauthorized_login",
+    "insurance_claim": "intent_insurance_claim",
     # Short yes/no — map to generic intent types so the widget can
     # still render actions the usual way.
     "affirmation": "intent_affirmation",

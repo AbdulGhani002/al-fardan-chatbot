@@ -52,31 +52,31 @@ GOODBYE_VARIANTS = (
 )
 
 AFFIRMATION_VARIANTS = (
-    "Great — happy to help. What would you like to do next? "
-    "Open an account, see our products, or ask something specific?",
+    "Excellent — happy to help. What would you like to do next? "
+    "Open an account, review our products, or discuss something specific?",
 
-    "Perfect. How can I help from here? I can walk you through signup, "
-    "explain a product, or route you to the team.",
+    "Perfect. How may I assist from here? I can walk you through signup, "
+    "explain a product in detail, or connect you with our desk.",
 
-    "Good — let's keep going. What's the next thing on your mind? "
-    "A specific product, a number, or the signup flow?",
+    "Understood — let's continue. What would you like to cover next? "
+    "A specific product, a number, or the onboarding flow?",
 
-    "Okay. Want me to walk you through the first step, or is there "
-    "something specific I can explain?",
+    "Of course. Would you like me to walk you through the first step, "
+    "or is there a specific aspect you would like me to explain?",
 )
 
 NEGATION_VARIANTS = (
-    "No worries — take your time. What else can I help with? I can "
-    "explain products, fees, or how we're regulated.",
+    "No concern — please take your time. What else may I help you with? "
+    "I can explain products, fees, or how we are regulated.",
 
-    "No problem. Anything else I can clarify? Products, fees, or "
-    "anything about how we work.",
+    "Of course. Is there anything else I can clarify? Products, fees, "
+    "or our operating framework.",
 
-    "Understood — no rush. If anything comes up, I'm here. Want to "
-    "browse another topic?",
+    "Understood — no rush. If anything else comes to mind, I am here. "
+    "Would you like to explore another topic?",
 
-    "All good. When you're ready, just ask. I can cover any product, "
-    "pricing, or compliance details.",
+    "Absolutely. When you are ready, please ask. I can cover any "
+    "product, pricing structure, or compliance detail.",
 )
 
 SIGNUP_VARIANTS = (
