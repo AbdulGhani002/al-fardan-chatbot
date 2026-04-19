@@ -98,6 +98,21 @@ MatchType = Literal[
     "intent_validator_diversification",
     "intent_monthly_statements",
     "intent_liquidation_details",
+    # Sets 11/12/13/14
+    "intent_partial_repayment",
+    "intent_hardware_wallet",
+    "intent_rewards_in_different_asset",
+    "intent_missing_rewards",
+    "intent_user_to_user_transfer",
+    "intent_otc_after_hours",
+    "intent_login_history",
+    "intent_interest_source",
+    "intent_rewards_expiration",
+    "intent_withdrawal_time",
+    "intent_active_sessions",
+    "intent_loan_transfer",
+    "intent_validator_locations",
+    "intent_historical_snapshot",
     "system_error",
 ]
 

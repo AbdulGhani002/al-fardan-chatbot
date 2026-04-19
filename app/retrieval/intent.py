@@ -74,6 +74,21 @@ Intent = Literal[
     "validator_diversification",
     "monthly_statements",
     "liquidation_details",
+    # Sets 11 + 12 + 13 + 14
+    "partial_repayment",
+    "hardware_wallet",
+    "rewards_in_different_asset",
+    "missing_rewards",
+    "user_to_user_transfer",
+    "otc_after_hours",
+    "login_history",
+    "interest_source",
+    "rewards_expiration",
+    "withdrawal_time",
+    "active_sessions",
+    "loan_transfer",
+    "validator_locations",
+    "historical_snapshot",
     "navigate_staking",
     "navigate_lending",
     "navigate_custody",
@@ -496,11 +511,15 @@ _EARLY_REPAYMENT_RE = re.compile(
 # Validator choice / selection.
 _VALIDATOR_CHOICE_RE = re.compile(
     r"\b("
-    r"(choose|select|pick|specify|nominate)\s+(a\s+|my\s+|which\s+|the\s+)?validator|"
+    # Adds "switch|change|swap|move" to the verb list — James Set 12 Q3
+    # "can I switch to a different validator if I'm not happy with
+    # performance" was falling through otherwise. Allow up to 3 adjective
+    # words between the verb and "validator" (e.g. "switch to a different").
+    r"(choose|select|pick|specify|nominate|switch|change|swap|move)\s+(to\s+)?((a|my|which|the|another|different|other)\s+){0,3}validator|"
     r"which\s+validator.*(stake|eth|sol|my)|"
-    r"can\s+i\s+(pick|select|choose|specify)\s+(a\s+|the\s+|my\s+)?validator|"
+    r"can\s+i\s+(pick|select|choose|specify|switch|change)\s+(to\s+)?((a|the|my|another|different|other)\s+){0,3}validator|"
     r"my\s+own\s+validator|"
-    r"validator\s+selection|"
+    r"validator\s+(selection|switch|change)|"
     r"byo\s+validator"
     r")\b",
     re.I,
@@ -562,9 +581,11 @@ _INTEREST_RATE_CHANGE_RE = re.compile(
     # Tolerant of filler words between "rate" and the change verb.
     r"(interest\s+|loan\s+)?rate(\s+\w+){0,5}\s+(change|changes|vary|varies|float|floats|adjust|adjusts|move|moves)|"
     r"(can|does|will)\s+(my\s+|the\s+)?(interest\s+|loan\s+)?rate\s+(change|vary|float|adjust)|"
-    r"fixed\s+or\s+variable\s+rate|"
-    r"variable\s+or\s+fixed\s+rate|"
-    r"is\s+(my\s+|the\s+)?rate\s+(fixed|variable|floating)"
+    r"fixed\s+or\s+variable(\s+\w+){0,3}|"
+    r"variable\s+or\s+fixed(\s+\w+){0,3}|"
+    # James Set 12 Q1 — "is the interest rate fixed or variable?"
+    r"is\s+(my\s+|the\s+|your\s+)?(interest\s+|loan\s+)?rate\s+(fixed|variable|floating)|"
+    r"(interest\s+|loan\s+)?rate\s+(fixed|variable|floating)"
     r")\b",
     re.I,
 )
@@ -829,6 +850,186 @@ _LIQUIDATION_DETAILS_RE = re.compile(
     re.I,
 )
 
+# ═════════════════════════════════════════════════════════════════════
+#  James QA Sets 11 + 12 + 13 (11 more intents)
+# ═════════════════════════════════════════════════════════════════════
+
+# "Can I repay PART of my loan early?" — distinct from early_repayment
+# because the user explicitly says "part" or "partial", and the reply
+# should emphasise that partial is allowed.
+_PARTIAL_REPAYMENT_RE = re.compile(
+    r"\b("
+    r"(repay|pay|settle)\s+(part|partial|partially|some|a\s+portion|a\s+bit|a\s+little)\s+(of\s+)?(my\s+|the\s+)?loan|"
+    r"partial\s+(loan\s+)?(repayment|payment|payoff)|"
+    r"(pay|repay)\s+(a\s+)?portion|"
+    r"part[\s-]?pay(ment)?\s+loan"
+    r")\b",
+    re.I,
+)
+
+# "Can I connect my Ledger / Trezor?" — answer NO with explanation.
+_HARDWARE_WALLET_RE = re.compile(
+    r"\b("
+    r"(connect|use|integrate|link|pair)\s+(my\s+|a\s+)?(ledger|trezor|hardware\s+wallet|keepkey|coldcard|cold\s+card|bitbox|lattice)|"
+    r"(ledger|trezor|hardware\s+wallet)\s+(to|with|in|into)\s+(custody|my\s+account|al.?fardan|q9)|"
+    r"hardware\s+wallet\s+(support|integration|connect|connection|compat)|"
+    r"does\s+(al.?fardan|q9)\s+support\s+(ledger|trezor|hardware)"
+    r")\b",
+    re.I,
+)
+
+# "Can I receive my rewards in another crypto?" — NO, paid in-kind.
+_REWARDS_IN_DIFFERENT_ASSET_RE = re.compile(
+    r"\b("
+    r"(receive|get|take|paid)\s+(my\s+|the\s+)?(staking\s+)?rewards?\s+in\s+(a\s+|an\s+)?(different|another|other|alternative|stable|stablecoin|stablecoins|usdc|usdt|dai)\b|"
+    r"(receive|get|take|paid)\s+(my\s+|the\s+)?(staking\s+)?rewards?\s+in\s+(a\s+|an\s+)?(different|another|other|alternative)\s+(crypto|coin|asset|currency|token|stablecoin)|"
+    r"rewards?\s+(paid|distributed)\s+in\s+(another|different|other|alternative|stablecoins?|usdc|usdt|dai)|"
+    r"(eth|sol|dot|atom|ada|avax|pol|matic)\s+rewards?\s+(as|in|paid\s+in)\s+(usdc|usdt|dai|stablecoin|cash|fiat|usd)|"
+    r"swap\s+(my\s+|the\s+)?staking\s+rewards?"
+    r")\b",
+    re.I,
+)
+
+# "Didn't receive my staking rewards today."
+_MISSING_REWARDS_RE = re.compile(
+    r"\b("
+    r"(didn'?t|did\s+not|don'?t|do\s+not|haven'?t|have\s+not)\s+(receive|get|see)\s+(my\s+|any\s+)?(staking\s+)?rewards?|"
+    r"(missing|missed|lost|not\s+getting|not\s+seeing)\s+(my\s+|some\s+|any\s+)?(staking\s+)?rewards?|"
+    r"(staking\s+)?rewards?\s+(not|never)\s+(paid|distributed|credited|arrived|received|shown|visible|appearing)|"
+    r"where\s+are\s+my\s+(staking\s+)?rewards?|"
+    r"expected\s+(my\s+|some\s+)?rewards?\s+(today|yesterday|this)"
+    r")\b",
+    re.I,
+)
+
+# "Can I send crypto directly to ANOTHER Al-Fardan user?" — distinct
+# from the existing internal_transfer which is between a SINGLE user's
+# own wallets. This one is between DIFFERENT users → answer NO.
+_USER_TO_USER_TRANSFER_RE = re.compile(
+    r"\b("
+    # Allow brand-name filler like "al fardan q9 user" — the q9 (plus
+    # any short token) can sit between "fardan" and the user noun.
+    r"send\s+(crypto|btc|eth|sol|funds|assets?|money|coins?)\s+(directly\s+)?to\s+another\s+(al[\s.-]?fardan(\s+\w+){0,2}\s+)?(user|person|account|client|customer|member)|"
+    r"transfer\s+(crypto|funds|assets?|money|balance)\s+between\s+(users|accounts|al[\s.-]?fardan(\s+\w+){0,2}\s+clients|different\s+accounts)|"
+    r"send\s+(crypto|btc|eth|sol|funds|balance)\s+to\s+(my\s+)?(friend|wife|husband|partner|colleague|brother|sister|son|daughter|family)|"
+    r"(peer[\s-]?to[\s-]?peer|p2p|user[\s-]to[\s-]user)\s+(transfer|send|payment)|"
+    r"send.*to\s+another\s+al[\s.-]?fardan"
+    r")\b",
+    re.I,
+)
+
+# "Can I get an OTC quote outside business hours?"
+_OTC_AFTER_HOURS_RE = re.compile(
+    r"\b("
+    # Generous: "outside [of] [the] [UAE] [business] hours" — allow
+    # up to 3 qualifier words between the preposition and "hours".
+    r"otc\s+(quote|trade|price|deal)\s+(after|outside|beyond|past|late|before)(\s+\w+){0,4}\s+hours|"
+    r"(24/7|24x7|weekend|night|nighttime|overnight|late[\s-]?night)\s+otc|"
+    r"quote\s+(outside|after)(\s+\w+){0,4}\s+hours|"
+    r"urgent\s+(otc\s+)?(quote|trade|deal)|"
+    r"otc\s+(weekend|sunday|saturday|friday)"
+    r")\b",
+    re.I,
+)
+
+# "Can I see my login history?"
+_LOGIN_HISTORY_RE = re.compile(
+    r"\b("
+    r"(see|view|check|display|show)\s+(my\s+|the\s+)?login\s+history|"
+    r"login\s+(history|log|activity|records?|audit)|"
+    r"(history|log)\s+of\s+(my\s+)?logins?|"
+    r"recent\s+logins?|"
+    r"list\s+of\s+(my\s+)?logins?"
+    r")\b",
+    re.I,
+)
+
+# "Where is the interest taken from?"
+_INTEREST_SOURCE_RE = re.compile(
+    r"\b("
+    r"where\s+is\s+(the\s+|my\s+)?interest\s+(taken|deducted|charged|paid|drawn|pulled)|"
+    r"interest\s+(come|comes|taken|paid|deducted|drawn)\s+from.*(wallet|collateral|balance|custody)|"
+    r"interest.*(deducted|taken)\s+from.*(wallet|collateral|balance)|"
+    r"wallet\s+or\s+(my\s+)?collateral"
+    r")\b",
+    re.I,
+)
+
+# "Do staking rewards expire?"
+_REWARDS_EXPIRATION_RE = re.compile(
+    r"\b("
+    r"(do|does)\s+(staking\s+|my\s+)?rewards?\s+expire|"
+    r"(staking\s+)?rewards?\s+(expire|expiration|expiry)|"
+    r"(claim|unclaimed)\s+rewards?\s+(expir|time\s+limit|deadline|lose|dropped)|"
+    r"rewards?\s+(time\s+limit|deadline|ttl)"
+    r")\b",
+    re.I,
+)
+
+# "How long does it take to withdraw to an EXTERNAL wallet?" —
+# distinct from internal_transfer (instant) and staking unbonding.
+_WITHDRAWAL_TIME_RE = re.compile(
+    r"\b("
+    r"how\s+long.*(withdraw|withdrawal|transfer|move|send)\s+(crypto|btc|eth|sol|funds|assets?)?.*(external|my\s+(personal\s+)?wallet|outside|off[\s-]?platform)|"
+    r"how\s+long.*(move|transfer|send)\s+(crypto|funds|assets?)\s+to\s+(external|outside|my\s+wallet|ledger|trezor)|"
+    r"(withdrawal|withdraw)\s+time.*(external|outside|off[\s-]?platform)|"
+    r"how\s+(fast|quick|long).*withdraw\s+(my\s+)?(crypto|funds|assets?|btc|eth|sol)"
+    r")\b",
+    re.I,
+)
+
+# "Can I see all devices logged into my account?"
+_ACTIVE_SESSIONS_RE = re.compile(
+    r"\b("
+    r"(see|view|check|list|show|display)\s+(all\s+)?(my\s+)?(active\s+)?(sessions?|devices|logins?)\s+(logged|signed)\s+(in|into)|"
+    r"(logged|signed)\s+in\s+(devices|sessions?)|"
+    r"active\s+(sessions?|devices|logins?)|"
+    r"where\s+am\s+i\s+(logged|signed)\s+in|"
+    r"(list|show|see)\s+(my\s+|all\s+)?devices|"
+    r"log\s+out\s+(all|other|remote)\s+(devices?|sessions?)|"
+    r"remote\s+(log[\s-]?out|sign[\s-]?out)"
+    r")\b",
+    re.I,
+)
+
+# ─── Set 14 intents ───────────────────────────────────────────────────
+
+# "Can I transfer my loan to another person or entity?" — NO.
+_LOAN_TRANSFER_RE = re.compile(
+    r"\b("
+    r"transfer\s+(my\s+|the\s+)?loan\s+to\s+(another|someone|a\s+different|a\s+new)|"
+    r"(assign|sell|reassign|hand\s+over|pass\s+on|pass\s+over|novate)\s+(my\s+|the\s+)?loan|"
+    r"loan\s+(transfer|assignment|novation|novate)\b|"
+    r"(transfer|give|pass)\s+(my\s+)?loan\s+(to|over)"
+    r")\b",
+    re.I,
+)
+
+# "Where are your validators physically located?"
+_VALIDATOR_LOCATIONS_RE = re.compile(
+    r"\b("
+    r"where\s+are\s+(your|our|the)\s+validators?\s+(located|based|hosted|physically|geograph)|"
+    r"validator\s+(location|locations|geography|data\s+cent(er|re)s?|region|regions|country|countries)|"
+    r"(physical|geographic)\s+(location|locations|diversit)\s+of\s+validators?|"
+    r"which\s+country.*validators?|"
+    r"where\s+do\s+you\s+(host|run)\s+validators?"
+    r")\b",
+    re.I,
+)
+
+# "Snapshot of my assets at a specific date and time." — distinct
+# from monthly_statements which is just the default monthly cut.
+_HISTORICAL_SNAPSHOT_RE = re.compile(
+    r"\b("
+    r"snapshot\s+of\s+(my\s+|all\s+)?(assets|holdings|balances|portfolio)|"
+    r"historical\s+(snapshot|holdings|balance|balances|portfolio)|"
+    r"statement\s+for\s+(a\s+)?(specific|custom|particular)\s+(date|time|period|window)|"
+    r"balance.*on\s+(a\s+)?(specific|particular)\s+date|"
+    r"what\s+did\s+i\s+(hold|own)\s+on\s+\d"
+    r")\b",
+    re.I,
+)
+
 
 def classify(text: str) -> Intent:
     """Return the most specific matching intent or 'unknown'.
@@ -858,18 +1059,27 @@ def classify(text: str) -> Intent:
         return "navigate_staking"
     if _START_LOAN_RE.search(text):
         return "navigate_lending"
-    # These three MUST fire BEFORE _START_WITHDRAW_RE so that the words
+    # These MUST fire BEFORE _START_WITHDRAW_RE so that the words
     # "withdraw" / "wallet" don't hijack a specific question about:
-    #   - whitelisting (which mentions "withdrawal addresses")
-    #   - internal transfers (which mentions "wallets")
-    #   - withdrawing staking rewards specifically
+    #   - whitelisting (mentions "withdrawal addresses")
+    #   - internal transfers (mentions "wallets")
+    #   - withdrawing staking rewards
+    #   - user-to-user transfers (mentions "send crypto")
+    #   - withdrawal time to external wallet
     if _WHITELIST_ADDRESS_RE.search(text):
         return "whitelist_address"
-    # IP whitelisting is also checked before withdraw since the user
-    # might phrase it as "whitelist IPs for login" and we'd otherwise
-    # mis-route to address whitelist.
     if _IP_WHITELISTING_RE.search(text):
         return "ip_whitelisting"
+    # user-to-user transfer BEFORE internal_transfer — former is
+    # "to another user", latter is "between my own wallets".
+    if _USER_TO_USER_TRANSFER_RE.search(text):
+        return "user_to_user_transfer"
+    # Withdrawal time to EXTERNAL wallet also beats _INTERNAL_TRANSFER_RE
+    # because phrasings like "move assets between custody and external
+    # wallet" otherwise match internal_transfer's "custody ... to ..."
+    # alternative with "external" as the target service.
+    if _WITHDRAWAL_TIME_RE.search(text):
+        return "withdrawal_time"
     if _INTERNAL_TRANSFER_RE.search(text):
         return "internal_transfer"
     if _STAKING_REWARDS_WITHDRAW_RE.search(text):
@@ -899,6 +1109,8 @@ def classify(text: str) -> Intent:
         return "cancel_otc"
     if _OTC_MAX_SIZE_RE.search(text):
         return "otc_max_size"
+    if _OTC_AFTER_HOURS_RE.search(text):
+        return "otc_after_hours"
     if _GOTO_OTC_RE.search(text):
         return "navigate_otc"
     # custody_minimum_balance must outrank _GOTO_CUSTODY_RE — "minimum
@@ -906,16 +1118,27 @@ def classify(text: str) -> Intent:
     # the generic navigate_custody reply instead of the specific answer.
     if _CUSTODY_MINIMUM_BALANCE_RE.search(text):
         return "custody_minimum_balance"
-    # shared_account + monthly_statements also mention "custody" or
-    # "account" and would hijack the nav route otherwise.
+    # These also mention "custody" or "account" and would hijack the
+    # nav route otherwise.
     if _SHARED_ACCOUNT_RE.search(text):
         return "shared_account"
     if _MONTHLY_STATEMENTS_RE.search(text):
         return "monthly_statements"
+    if _HARDWARE_WALLET_RE.search(text):
+        return "hardware_wallet"
     if _GOTO_CUSTODY_RE.search(text):
         return "navigate_custody"
+    # Settings-specific asks beat navigate_settings.
+    if _LOGIN_HISTORY_RE.search(text):
+        return "login_history"
+    if _ACTIVE_SESSIONS_RE.search(text):
+        return "active_sessions"
     if _GOTO_SETTINGS_RE.search(text):
         return "navigate_settings"
+    # interest_source contains "wallet" and would lose to navigate_wallets
+    # otherwise.
+    if _INTEREST_SOURCE_RE.search(text):
+        return "interest_source"
     if _GOTO_WALLETS_RE.search(text):
         return "navigate_wallets"
     if _CONTACT_RE.search(text):
@@ -1022,6 +1245,24 @@ def classify(text: str) -> Intent:
         return "validator_diversification"
     if _LIQUIDATION_DETAILS_RE.search(text):
         return "liquidation_details"
+    # ─── Sets 11-14 — specific Q&A that must beat generic topic
+    #     routes. Loan-management + staking-management + info-lookup.
+    # (interest_source / hardware_wallet already handled above, in the
+    # nav-outrank sections)
+    if _PARTIAL_REPAYMENT_RE.search(text):
+        return "partial_repayment"
+    if _LOAN_TRANSFER_RE.search(text):
+        return "loan_transfer"
+    if _REWARDS_IN_DIFFERENT_ASSET_RE.search(text):
+        return "rewards_in_different_asset"
+    if _MISSING_REWARDS_RE.search(text):
+        return "missing_rewards"
+    if _REWARDS_EXPIRATION_RE.search(text):
+        return "rewards_expiration"
+    if _VALIDATOR_LOCATIONS_RE.search(text):
+        return "validator_locations"
+    if _HISTORICAL_SNAPSHOT_RE.search(text):
+        return "historical_snapshot"
     if _API_KEY_MANAGEMENT_RE.search(text):
         return "api_key_management"
     if _LOAN_Q_RE.search(text):
@@ -1369,14 +1610,16 @@ def scripted_reply(intent: Intent) -> str | None:
             "like me to connect you with Layla for a firm quote?"
         )
     if intent == "api_key_management":
+        # Flagged by James Set 11 Q10 — the self-service API-key UI
+        # doesn't exist yet. Do NOT claim features we don't ship.
         return (
-            "Yes, you can create and revoke API keys yourself. Go to "
-            "Settings → API Keys → Create Key. Pick the scope (read-only, "
-            "trade, or withdraw), give it a label, and copy the secret "
-            "immediately — it is shown only once. To delete, click 'Revoke' "
-            "next to any key and it dies instantly. For $1M+ AUM clients "
-            "we also support IP-scoped keys and HMAC-SHA256 request signing. "
-            "Would you like me to guide you through creating your first key?"
+            "API keys are available only to institutional clients and are "
+            "issued manually by our team — there is no self-service UI in "
+            "the dashboard today. Please email institutional@alfardanq9.com "
+            "with your account details and intended use case (read-only "
+            "balances, trade execution, etc.) and we'll scope + issue a "
+            "key with HMAC-SHA256 signing. Would you like me to connect "
+            "you with our API support team?"
         )
     if intent == "staking_rewards_withdraw":
         return (
@@ -1544,6 +1787,157 @@ def scripted_reply(intent: Intent) -> str | None:
             "might sell ~0.15 BTC — you keep the rest plus any remaining "
             "equity after loan payoff. Would you like me to calculate a "
             "liquidation scenario for your position?"
+        )
+    # ─── Sets 11-14 replies ──────────────────────────────────────
+    if intent == "partial_repayment":
+        return (
+            "Yes, you can make partial repayments at any time. There is "
+            "no prepayment penalty — interest is calculated pro-rata on "
+            "the outstanding balance, so each partial repayment reduces "
+            "the remaining cost proportionally. Go to Lending → Active "
+            "Loans → Repay, enter the amount, and the balance updates "
+            "immediately. Would you like me to calculate how much "
+            "interest you would save with a specific partial repayment?"
+        )
+    if intent == "hardware_wallet":
+        return (
+            "No, you cannot connect a Ledger or Trezor directly to your "
+            "custody account. Our custody runs on Fireblocks MPC-CMP — "
+            "keys are split into shards across multiple HSMs, so there "
+            "isn't a single private key that a hardware wallet could "
+            "pair with. However, you can withdraw your assets to your "
+            "Ledger / Trezor at any time — the withdrawal address is "
+            "the one your hardware wallet generates. Would you like me "
+            "to walk you through withdrawing to a hardware wallet?"
+        )
+    if intent == "rewards_in_different_asset":
+        return (
+            "No, staking rewards are paid in-kind — ETH rewards in ETH, "
+            "SOL rewards in SOL, etc. This is a protocol-level rule, "
+            "not a policy of ours. However, you can swap your rewards "
+            "for stablecoins (USDC / USDT) or any other supported asset "
+            "via our OTC desk, or convert smaller amounts through our "
+            "trading platform. Would you like me to help you swap your "
+            "rewards into stablecoins?"
+        )
+    if intent == "missing_rewards":
+        return (
+            "Staking rewards are distributed daily at 00:00 UTC. If you "
+            "don't see today's rewards by ~02:00 UTC, first check the "
+            "Staking page — the reward counter updates as soon as the "
+            "epoch closes. If they're still not showing after that, "
+            "please email support@alfardanq9.com with your account "
+            "email, the network (ETH / SOL / etc.), and the specific "
+            "date — we investigate and credit any missed rewards plus "
+            "a good-faith top-up for the inconvenience. Would you like "
+            "me to help you check your recent rewards?"
+        )
+    if intent == "user_to_user_transfer":
+        return (
+            "No, Al-Fardan Q9 doesn't support direct user-to-user "
+            "transfers on the platform — we're a custodian, not a "
+            "payment network. If you need to send crypto to another "
+            "Al-Fardan client, you'd withdraw to their external wallet "
+            "address (they can find it on their Wallets → Deposit "
+            "page) as a normal on-chain transfer. Network fees apply, "
+            "same as any withdrawal. Would you like me to explain how "
+            "to set up the withdrawal?"
+        )
+    if intent == "otc_after_hours":
+        return (
+            "No, standard OTC quotes only run during UAE business "
+            "hours (Sunday-Thursday, 9am-6pm GST). For urgent trades "
+            "outside those hours, email otc@alfardanq9.com or call our "
+            "24/7 emergency line at +971 4 123 4568 — the on-call "
+            "dealer can provide a firm quote within 15 minutes for "
+            "qualifying tickets (≥ $5M). Would you like me to flag an "
+            "out-of-hours request for you?"
+        )
+    if intent == "login_history":
+        return (
+            "Yes, you can review your login history. Go to Settings → "
+            "Security → Login History. You'll see each recent login "
+            "with date, time, device fingerprint, and approximate "
+            "location. If any entry looks unfamiliar, tap 'Flag as "
+            "suspicious' on that row and our security team will "
+            "follow up within 2 UAE business hours. Would you like me "
+            "to help you review your login history now?"
+        )
+    if intent == "interest_source":
+        return (
+            "Interest is deducted from your available custody balance "
+            "— never from the pledged collateral. On the scheduled "
+            "monthly date we debit the cost amount from your custody "
+            "wallet (in USD, AED, or EUR as chosen at signing, or "
+            "you can pre-elect stablecoin). If your balance is short, "
+            "we'll notify you 5 days ahead so you can top up. Would "
+            "you like me to explain how to set up auto-top-up from "
+            "a bank transfer?"
+        )
+    if intent == "rewards_expiration":
+        return (
+            "No, staking rewards never expire. They accumulate to "
+            "your staked principal (ETH auto-compounds) or sit as "
+            "liquid rewards in your custody (SOL / ATOM / DOT), and "
+            "you can claim or re-deploy them whenever you want — "
+            "years later is fine. There's no sweep, no loss, no "
+            "time-decay. Would you like me to help you check your "
+            "accumulated rewards?"
+        )
+    if intent == "withdrawal_time":
+        return (
+            "Withdrawals to an external wallet typically complete in "
+            "1-4 hours during UAE business hours (most are done "
+            "within 1 hour). Breakdown: you submit → admin reviews "
+            "(≤ 1 hour) → Fireblocks broadcasts → blockchain confirms "
+            "(10-30 minutes for BTC, a few minutes for ETH, seconds "
+            "for SOL). Off-hours withdrawals process the next "
+            "business morning. Whitelisted addresses skip the admin "
+            "queue and go in minutes. Would you like me to walk you "
+            "through submitting a withdrawal?"
+        )
+    if intent == "active_sessions":
+        return (
+            "Yes, you can see every device that's signed into your "
+            "account. Go to Settings → Security → Active Sessions — "
+            "each row shows device, browser, approximate location, "
+            "and last-active time. Tap 'Sign Out' on any row to "
+            "terminate that session remotely, or 'Sign Out All' to "
+            "end every session including the current one. Would you "
+            "like me to help you review your active sessions now?"
+        )
+    if intent == "loan_transfer":
+        return (
+            "No, loans cannot be transferred to another person or "
+            "entity — the agreement is specific to the original "
+            "borrower and the collateral pledged. If someone else "
+            "needs the liquidity, the cleanest path is: you repay "
+            "early (no prepayment penalty, interest pro-rata on "
+            "actual duration), your collateral releases, and they "
+            "apply for their own loan against their own collateral. "
+            "Would you like me to calculate your current payoff "
+            "amount?"
+        )
+    if intent == "validator_locations":
+        return (
+            "Our validators run across three continents in Tier-IV "
+            "data centres: Dubai (UAE), Singapore, and Frankfurt "
+            "(Germany). Geographic + provider diversity means no "
+            "single outage, jurisdiction change, or AZ failure takes "
+            "validators offline together — we maintain 99.95% uptime "
+            "SLA with automatic failover. Would you like me to share "
+            "more detail on our infrastructure setup?"
+        )
+    if intent == "historical_snapshot":
+        return (
+            "Yes, you can generate a statement for any historical "
+            "date or date range. Go to Wallets → Statements → Custom "
+            "Range, pick the start and end dates, and download the "
+            "PDF / CSV. The report includes opening + closing "
+            "balances per asset, every transaction in the window, "
+            "and the fiat valuation at end-of-day. Useful for audits, "
+            "tax filings, and board reports. Would you like me to "
+            "help you generate a statement for a specific date?"
         )
     if intent == "session_timeout":
         return (
@@ -1723,6 +2117,21 @@ _INTENT_TO_MATCH_TYPE = {
     "validator_diversification": "intent_validator_diversification",
     "monthly_statements": "intent_monthly_statements",
     "liquidation_details": "intent_liquidation_details",
+    # Sets 11/12/13/14
+    "partial_repayment": "intent_partial_repayment",
+    "hardware_wallet": "intent_hardware_wallet",
+    "rewards_in_different_asset": "intent_rewards_in_different_asset",
+    "missing_rewards": "intent_missing_rewards",
+    "user_to_user_transfer": "intent_user_to_user_transfer",
+    "otc_after_hours": "intent_otc_after_hours",
+    "login_history": "intent_login_history",
+    "interest_source": "intent_interest_source",
+    "rewards_expiration": "intent_rewards_expiration",
+    "withdrawal_time": "intent_withdrawal_time",
+    "active_sessions": "intent_active_sessions",
+    "loan_transfer": "intent_loan_transfer",
+    "validator_locations": "intent_validator_locations",
+    "historical_snapshot": "intent_historical_snapshot",
     # Short yes/no — map to generic intent types so the widget can
     # still render actions the usual way.
     "affirmation": "intent_affirmation",
