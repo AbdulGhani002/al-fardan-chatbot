@@ -197,19 +197,93 @@ def _compose_crisis(text: str) -> str:
 
 # ─── Clarification: ask back when key info is missing ─────────────
 
+import re as _re
+
+# Question-form detector — a message is a QUESTION (not an intent-to-do)
+# when it either ends with "?" or opens with a question word. Questions
+# should flow through to the semantic retriever, NOT into the "ask for
+# amount+asset" clarification branches below (those are meant only for
+# users who EXPRESS an intent to do an action).
+_QUESTION_OPENER_RE = _re.compile(
+    r"^\s*("
+    r"can|could|will|would|should|shall|may|might|must|do|does|did|is|"
+    r"are|was|were|am|have|has|had|what|whats|when|whens|where|wheres|"
+    r"which|who|whos|whose|whom|why|whys|how|hows|"
+    # Also treat leading "please" / "help me understand" / "tell me"
+    # as question-form so "tell me how staking works" doesn't get
+    # mis-clarified.
+    r"please\s+(tell|explain|help)|tell\s+me|explain|help\s+me\s+understand"
+    r")\b",
+    _re.I,
+)
+
+# Intent-to-do markers. Even inside a longer message these indicate the
+# user WANTS to do the thing right now, not ask about it. If we see
+# these + an action word, the clarification branch is appropriate.
+_INTENT_TO_DO_RE = _re.compile(
+    r"\b("
+    r"i\s+(want|wanna|need|would\s+like|wish|plan)\s+to|"
+    r"i'?d\s+like\s+to|"
+    r"let\s+me|help\s+me|let's|lets|"
+    r"please\s+(help|let|allow)\s+me|"
+    r"take\s+me\s+to|go\s+to|i'?m\s+(ready|looking)\s+to"
+    r")\b",
+    _re.I,
+)
+
+
+def _is_question_form(text: str) -> bool:
+    """True if the message reads as a question rather than an
+    intent-to-do statement. Questions should flow to retrieval.
+
+    Logic:
+      - Explicit intent-to-do markers ("I want to...", "let me...")
+        trump everything — even if the message ends in "?" we treat
+        it as action ("I want to stake, is that possible?").
+      - Otherwise: ends in "?", or opens with a question word.
+    """
+    if not text:
+        return False
+    if _INTENT_TO_DO_RE.search(text):
+        return False
+    if text.rstrip().endswith("?"):
+        return True
+    if _QUESTION_OPENER_RE.match(text):
+        return True
+    return False
+
+
 def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
     """If the user stated an intent but left out the critical info,
-    ask for it instead of guessing."""
+    ask for it instead of guessing.
+
+    CRITICAL: this branch fires ONLY on clear intent-to-do statements
+    ("I want to borrow", "help me stake") — NEVER on questions about
+    the products ("Can I negotiate the interest rate?"). Questions
+    are routed to the semantic retriever instead. Previously we only
+    skipped very short questions; that was the root cause of repeated
+    "wrong intent" mis-routings across James's QA sets.
+    """
     actions = entities.get("actions") or []
     amounts = entities.get("amounts") or []
     assets = entities.get("assets") or []
     text = (entities.get("text") or "").lower()
 
-    # Short question — don't clarify on casual questions
-    is_short_question = len(text.split()) <= 3
+    # Skip clarification entirely for questions. The retriever handles
+    # those — they should land on a specific KB entry or scripted
+    # intent reply, not a generic "ask for amount + asset" prompt.
+    if _is_question_form(text):
+        return None
+
+    # Also skip very short fragments (≤ 3 words) — the previous
+    # heuristic; still useful for catching casual "stake?" / "lend?"
+    # without over-qualifying.
+    is_short_fragment = len(text.split()) <= 3
+    if is_short_fragment:
+        return None
 
     # "I want to borrow" / "can i take a loan" — no amount, no asset
-    if "borrow" in actions and not amounts and not assets and not is_short_question:
+    if "borrow" in actions and not amounts and not assets:
         return (
             "Happy to help with a loan. Two things: how much do you want "
             "to borrow (USD, AED, or EUR), and how much BTC or ETH can "
@@ -218,7 +292,7 @@ def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
         )
 
     # "I want to stake" — no amount, no asset
-    if "stake" in actions and not amounts and not assets and not is_short_question:
+    if "stake" in actions and not amounts and not assets:
         return (
             "Good choice — which network would you like to stake? We "
             "support ETH, SOL, POL, ADA, DOT, AVAX, and ATOM. And "
@@ -227,7 +301,7 @@ def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
         )
 
     # "I want to withdraw" — no asset/amount
-    if "withdraw" in actions and not amounts and not assets and not is_short_question:
+    if "withdraw" in actions and not amounts and not assets:
         return (
             "Sure — which asset are you withdrawing, and how much? "
             "Typical processing: 1-4 hours for crypto, 24 hours for fiat wire.",
@@ -235,14 +309,19 @@ def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
         )
 
     # "I want to deposit" — no asset
-    if "deposit" in actions and not assets and not is_short_question:
+    if "deposit" in actions and not assets:
         return (
             "Pick an asset and I'll get you a deposit address. BTC, ETH, "
             "SOL, USDT, or USDC? (We support 40+ networks — which one?)",
             [{"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"}],
         )
 
-    # "how much can i get/earn/borrow" without asset or amount
+    # "how much can i get/earn/borrow" WITHOUT asset or amount.
+    # Kept deliberately OUTSIDE the question-form guard because even
+    # though "how much" is technically a question, the user needs
+    # specific input (asset + amount) before we can compute anything.
+    # But we ONLY fire if no retrieval-worthy context is present —
+    # i.e. the user hasn't named a topic the retriever could match on.
     if ("borrow" in actions or "earn" in actions) and not amounts and not assets:
         if "how much" in text:
             return (
