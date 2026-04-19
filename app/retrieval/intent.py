@@ -56,6 +56,10 @@ Intent = Literal[
     "otc_counterparty",
     "api_key_management",
     "staking_rewards_withdraw",
+    # ─── Set 6 ──────────────────────────────────────────────────
+    "ltv_calculation",
+    "rewards_history",
+    "session_timeout",
     "navigate_staking",
     "navigate_lending",
     "navigate_custody",
@@ -602,6 +606,48 @@ _STAKING_REWARDS_WITHDRAW_RE = re.compile(
     re.I,
 )
 
+# ═════════════════════════════════════════════════════════════════════
+#  James QA Set 6 (3 more intents)
+# ═════════════════════════════════════════════════════════════════════
+
+# LTV formula / calculation basis.
+_LTV_CALCULATION_RE = re.compile(
+    r"\b("
+    r"how\s+is\s+(the\s+|my\s+)?ltv\s+(calculated|computed|worked\s+out|derived)|"
+    r"ltv\s+(formula|calculation|based\s+on|formula\s+is)|"
+    r"loan[\s-]to[\s-]value\s+(formula|calculation|ratio|calculated|computed)|"
+    r"how\s+do\s+you\s+calculate\s+ltv|"
+    r"ltv\s+(current\s+|real[\s-]time\s+|live\s+)?(market\s+)?price"
+    r")\b",
+    re.I,
+)
+
+# Staking rewards history / export.
+_REWARDS_HISTORY_RE = re.compile(
+    r"\b("
+    r"(staking\s+)?rewards?\s+(history|log|record|archive|tape)|"
+    r"(history|log)\s+of\s+(my\s+)?(staking\s+)?rewards?|"
+    r"how\s+far\s+back\s+(do\s+)?(rewards?|my\s+rewards?)|"
+    r"export\s+(my\s+)?(staking\s+)?rewards?|"
+    r"see\s+(my\s+)?(staking\s+)?rewards?\s+history|"
+    r"view\s+(my\s+)?(past|historical)\s+(staking\s+)?rewards?"
+    r")\b",
+    re.I,
+)
+
+# Session timeout / auto-logout.
+_SESSION_TIMEOUT_RE = re.compile(
+    r"\b("
+    r"session\s+(timeout|time\s+out|times?\s+out|expir|expires|length|duration|limit|time\s+limit)|"
+    r"(how\s+long\s+before|when\s+does)\s+(my\s+)?session\s+(times?[\s-]?out|expire|end|terminate|log\s+me\s+out)|"
+    r"auto[\s-]?(logout|log[\s-]?out|sign[\s-]?out)|"
+    r"automatic(ally)?\s+logged?\s+out|"
+    r"change\s+(my\s+|the\s+)?session\s+(timeout|duration|length)|"
+    r"extend\s+(my\s+|the\s+)?session"
+    r")\b",
+    re.I,
+)
+
 
 def classify(text: str) -> Intent:
     """Return the most specific matching intent or 'unknown'.
@@ -749,6 +795,16 @@ def classify(text: str) -> Intent:
         return "account_closure"
     if _OTC_COUNTERPARTY_RE.search(text):
         return "otc_counterparty"
+    # Set 6 — session_timeout must beat the generic navigate_settings
+    # route (which would catch "session timeout" via "settings").
+    # Actually navigate_settings already fired in the action block;
+    # if we reach here it didn't match, so we're safe to just check.
+    if _LTV_CALCULATION_RE.search(text):
+        return "ltv_calculation"
+    if _REWARDS_HISTORY_RE.search(text):
+        return "rewards_history"
+    if _SESSION_TIMEOUT_RE.search(text):
+        return "session_timeout"
     if _API_KEY_MANAGEMENT_RE.search(text):
         return "api_key_management"
     if _LOAN_Q_RE.search(text):
@@ -1114,6 +1170,36 @@ def scripted_reply(intent: Intent) -> str | None:
             "SOL ~2d) if you're withdrawing freshly-unstaked principal. "
             "Would you like me to help you submit a withdrawal?"
         )
+    # ─── Set 6 replies ───────────────────────────────────────────
+    if intent == "ltv_calculation":
+        return (
+            "LTV (Loan-to-Value) is calculated as (Loan Amount ÷ Collateral "
+            "Value) × 100, and yes — it is based on the current market "
+            "price of your collateral, updated in real time. Example: pledge "
+            "1 BTC at $70,000 and borrow $35,000 → LTV is 50%. Our cap is "
+            "75% (among the highest institutional), margin call triggers at "
+            "85%, liquidation at 90%. Would you like me to calculate LTV "
+            "for your specific collateral?"
+        )
+    if intent == "rewards_history":
+        return (
+            "Yes, you can see your full staking rewards history in the "
+            "Staking module of your dashboard — Staking → Reward History. "
+            "You can view daily, monthly, and yearly breakdowns per network, "
+            "and export to CSV for your accountant. History goes back to "
+            "the start of your first stake on each network. Would you like "
+            "me to help you export your rewards history?"
+        )
+    if intent == "session_timeout":
+        return (
+            "Your session times out after 30 minutes of inactivity — for "
+            "security reasons this is fixed and cannot be extended per-"
+            "user. JWTs themselves expire after 7 days (you'll be re-asked "
+            "to sign in then even with activity). If you need a longer-"
+            "lived connection for programmatic access, use an API key from "
+            "Settings → API Keys instead of a browser session. Would you "
+            "like me to help you set up an API key?"
+        )
     if intent == "deposit_request":
         return (
             "Deposits: go to Wallets → pick your asset → copy the deposit address "
@@ -1264,6 +1350,10 @@ _INTENT_TO_MATCH_TYPE = {
     "otc_counterparty": "intent_otc_counterparty",
     "api_key_management": "intent_api_key_management",
     "staking_rewards_withdraw": "intent_staking_rewards_withdraw",
+    # Set 6
+    "ltv_calculation": "intent_ltv_calculation",
+    "rewards_history": "intent_rewards_history",
+    "session_timeout": "intent_session_timeout",
     # Short yes/no — map to generic intent types so the widget can
     # still render actions the usual way.
     "affirmation": "intent_affirmation",

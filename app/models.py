@@ -80,6 +80,10 @@ MatchType = Literal[
     "intent_otc_counterparty",
     "intent_api_key_management",
     "intent_staking_rewards_withdraw",
+    # Set 6
+    "intent_ltv_calculation",
+    "intent_rewards_history",
+    "intent_session_timeout",
     "system_error",
 ]
 
