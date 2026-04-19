@@ -113,6 +113,12 @@ MatchType = Literal[
     "intent_loan_transfer",
     "intent_validator_locations",
     "intent_historical_snapshot",
+    # Set 15
+    "intent_otc_settlement_currency",
+    "intent_temporary_deactivation",
+    "intent_collateral_revaluation",
+    "intent_tax_withholding",
+    "intent_account_recovery",
     "system_error",
 ]
 

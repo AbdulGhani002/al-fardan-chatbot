@@ -89,6 +89,12 @@ Intent = Literal[
     "loan_transfer",
     "validator_locations",
     "historical_snapshot",
+    # Set 15
+    "otc_settlement_currency",
+    "temporary_deactivation",
+    "collateral_revaluation",
+    "tax_withholding",
+    "account_recovery",
     "navigate_staking",
     "navigate_lending",
     "navigate_custody",
@@ -389,10 +395,83 @@ _UNAUTHORIZED_LOGIN_RE = re.compile(
 # includes the claim email + phone + needed info.
 _INSURANCE_CLAIM_RE = re.compile(
     r"\b("
-    r"(file|filing|submit|raise|make)\s+(an?\s+)?(insurance\s+)?claim|"
-    r"how\s+(do|to)\s+(i\s+)?(file|submit|raise|make)\s+(an?\s+)?(insurance\s+)?claim|"
+    # Added "start|open|initiate|begin|lodge" to verb list so
+    # "how do I start an insurance claim" (James Set 15 Q2) also
+    # routes correctly. Also added "stolen|theft|loss|incident|hack"
+    # as qualifiers so phrasings that skip the word "insurance"
+    # still land here.
+    r"(file|filing|submit|raise|make|start|open|initiate|begin|lodge)\s+(an?\s+)?(insurance\s+|stolen[\s-]asset\s+|theft\s+|loss\s+)?claim|"
+    r"how\s+(do|to)\s+(i\s+)?(file|submit|raise|make|start|open|initiate|begin|lodge)\s+(an?\s+)?(insurance\s+|stolen[\s-]asset\s+|theft\s+)?claim|"
     r"claim\s+(process|procedure|steps|instructions)|"
-    r"insurance\s+claim\s+process"
+    r"insurance\s+claim\s+process|"
+    r"claim\s+for\s+(stolen|lost|theft|hacked|missing)\s+(assets?|funds|crypto|btc|eth|sol|money)"
+    r")\b",
+    re.I,
+)
+
+# ─── Set 15 intents ───────────────────────────────────────────────────
+
+# "Can I settle OTC in a different currency than quoted?" — YES.
+# Distinct from navigate_otc (generic intro) and otc_quote_validity.
+_OTC_SETTLEMENT_CURRENCY_RE = re.compile(
+    r"\b("
+    r"settle\s+(an?\s+|my\s+|the\s+)?otc\s+(trade|quote|order|deal)?\s*in\s+(a\s+)?(different|another|alternative|other)\s+currency|"
+    r"(different|another|alternative|other)\s+(settlement\s+)?currency\s+(than|from|to)\s+(quoted|the\s+quote)|"
+    r"change\s+(the\s+|my\s+)?(otc\s+)?settlement\s+currency|"
+    r"otc\s+(settlement\s+)?currenc(y|ies)\s+(options?|choices?|support)"
+    r")\b",
+    re.I,
+)
+
+# "Can I temporarily deactivate my account?" — NO.
+_TEMPORARY_DEACTIVATION_RE = re.compile(
+    r"\b("
+    r"temporar(il)?y\s+(deactivate|pause|suspend|freeze|disable|lock|hold)\s+(my\s+|the\s+)?account|"
+    r"(pause|suspend|freeze|put\s+on\s+hold)\s+(my\s+|the\s+)?account|"
+    r"(deactivate|disable)\s+(my\s+|the\s+)?account\s+(temporar|for\s+a\s+while|for\s+now)|"
+    r"account\s+(hibernation|dormancy|hold|pause|suspension|freeze)|"
+    r"go\s+dormant"
+    r")\b",
+    re.I,
+)
+
+# "How often is my collateral revalued?" — continuously.
+_COLLATERAL_REVALUATION_RE = re.compile(
+    r"\b("
+    # Each verb has \w* so the `\b` at the outer group can still match
+    # after "revalued" / "repriced" / "updated" etc.
+    r"(how\s+often|when)\s+(is|are)\s+(my\s+|the\s+)?collateral\s+(revalu\w*|re[\s-]?pric\w*|updat\w*|mark\w*|valu\w*|assess\w*)|"
+    r"collateral\s+(revaluation|re[\s-]?pric\w*|update\s+frequency|valuation\s+frequency|mark[\s-]to[\s-]market)|"
+    r"(ltv|collateral\s+value)\s+(update|refresh|recalc)\s+(frequency|interval|how\s+often)|"
+    r"(price|value)\s+(update|refresh)\s+(of|for)\s+(my\s+)?collateral"
+    r")\b",
+    re.I,
+)
+
+# "Do you withhold taxes from my staking rewards?" — NO.
+_TAX_WITHHOLDING_RE = re.compile(
+    r"\b("
+    r"(do|does)\s+(you|al[\s.-]?fardan)\s+withhold\s+(any\s+|my\s+)?(taxes|tax)|"
+    r"(tax|taxes)\s+(withheld|withhold|deducted|deduction)\s+(from|on)\s+(my\s+|the\s+)?(staking\s+)?rewards?|"
+    r"(tax|taxes)\s+withholding\s+on\s+(my\s+|staking\s+)?rewards?|"
+    r"tax\s+deduction\s+(from|on)\s+(my\s+)?(staking\s+)?rewards?|"
+    r"automatic\s+tax\s+(withhold|deduction)"
+    r")\b",
+    re.I,
+)
+
+# "What is the process to recover my account if I lose access?"
+# Distinct from unauthorized_login (security alerts) + the forgot-
+# password self-service flow — this is the full identity-recovery
+# process with video KYC.
+_ACCOUNT_RECOVERY_RE = re.compile(
+    r"\b("
+    r"recover\s+(my\s+|the\s+)?account|"
+    r"account\s+recovery|"
+    r"(lost|lose|can'?t|cannot|no)\s+access\s+to\s+(my\s+)?account|"
+    r"regain\s+access\s+to\s+(my\s+)?account|"
+    r"(process|how\s+to|how\s+do\s+i)\s+(recover|get\s+back\s+into)\s+(my\s+)?account|"
+    r"lost\s+(my\s+)?(password|email|2fa|device|phone|everything).*account"
     r")\b",
     re.I,
 )
@@ -1144,6 +1223,12 @@ def classify(text: str) -> Intent:
     if _CONTACT_RE.search(text):
         return "contact_support"
 
+    # ─── Insurance-claim check must beat the signup regex because
+    #     "how do I start an insurance claim" matches "how do i start"
+    #     in _SIGNUP_RE. Set 15 Q2.
+    if _INSURANCE_CLAIM_RE.search(text):
+        return "insurance_claim"
+
     # ─── Signup flow — user wants to create an account ────────────
     # Skip signup intent if the message also contains a specific money
     # amount or minimum/qualify keyword — those are quantitative
@@ -1214,6 +1299,11 @@ def classify(text: str) -> Intent:
     # staking_network_fees + custody_minimum_balance already fire
     # earlier (above the generic nav routes), so we don't need to
     # re-check them here.
+    # temporary_deactivation must beat account_closure because phrases
+    # like "temporarily deactivate instead of closing" contain "close"
+    # which account_closure would otherwise match.
+    if _TEMPORARY_DEACTIVATION_RE.search(text):
+        return "temporary_deactivation"
     if _ACCOUNT_CLOSURE_RE.search(text):
         return "account_closure"
     if _OTC_COUNTERPARTY_RE.search(text):
@@ -1263,6 +1353,18 @@ def classify(text: str) -> Intent:
         return "validator_locations"
     if _HISTORICAL_SNAPSHOT_RE.search(text):
         return "historical_snapshot"
+    # ─── Set 15 ──────────────────────────────────────────────────
+    # (insurance_claim + temporary_deactivation already handled above,
+    # earlier in classify() — they needed to outrank signup /
+    # account_closure respectively.)
+    if _OTC_SETTLEMENT_CURRENCY_RE.search(text):
+        return "otc_settlement_currency"
+    if _COLLATERAL_REVALUATION_RE.search(text):
+        return "collateral_revaluation"
+    if _TAX_WITHHOLDING_RE.search(text):
+        return "tax_withholding"
+    if _ACCOUNT_RECOVERY_RE.search(text):
+        return "account_recovery"
     if _API_KEY_MANAGEMENT_RE.search(text):
         return "api_key_management"
     if _LOAN_Q_RE.search(text):
@@ -1939,6 +2041,62 @@ def scripted_reply(intent: Intent) -> str | None:
             "tax filings, and board reports. Would you like me to "
             "help you generate a statement for a specific date?"
         )
+    # ─── Set 15 replies ──────────────────────────────────────────
+    if intent == "otc_settlement_currency":
+        return (
+            "Yes, you can settle in a currency other than the quote "
+            "currency. We support 8 settlement currencies: AED, SAR, "
+            "KWD, BHD, QAR, OMR, USD, and EUR. Tell the dealer your "
+            "preferred settlement currency when requesting the quote "
+            "and we'll lock it in (cross-currency quotes use our "
+            "daily spot at execution time). Would you like me to "
+            "connect you with our OTC desk for a quote in your "
+            "preferred currency?"
+        )
+    if intent == "temporary_deactivation":
+        return (
+            "No, we don't offer temporary deactivation of an account. "
+            "Your options are: (1) keep it active with zero balance "
+            "— no fees, no monthly charges, nothing happens until you "
+            "come back; or (2) permanently close it via support "
+            "(irreversible, see our account-closure policy for data "
+            "retention). Most clients on a pause simply leave the "
+            "account idle. Would you like me to explain the permanent "
+            "closure process instead?"
+        )
+    if intent == "collateral_revaluation":
+        return (
+            "Your collateral is revalued in real time — every price "
+            "tick from our live CoinGecko feed updates your LTV "
+            "immediately in the dashboard. There's no daily cut-off "
+            "or delayed refresh. The margin-call + liquidation "
+            "triggers fire on the same live prices, so there's no "
+            "stale-valuation risk either way. Would you like me to "
+            "explain how LTV is calculated?"
+        )
+    if intent == "tax_withholding":
+        return (
+            "No, we don't withhold any tax from your staking rewards "
+            "or OTC gains. Rewards are paid to you in full; tax "
+            "reporting + payment is your responsibility based on "
+            "your jurisdiction. We provide full transaction history "
+            "(Settings → Statements, CSV + PDF) so you or your "
+            "accountant has everything needed. Would you like me to "
+            "help you export your rewards report?"
+        )
+    if intent == "account_recovery":
+        return (
+            "Account recovery process: (1) Email "
+            "support@alfardanq9.com from ANY address (your account "
+            "email is ideal but not required). (2) Our team sends a "
+            "video-KYC booking link — show your government-issued ID "
+            "on the call. (3) Once we verify your identity against "
+            "your KYC records, we reset your 2FA and issue a "
+            "password-reset link. End-to-end typically 24-48 hours "
+            "for standard cases, same-day during UAE business hours. "
+            "Would you like me to connect you with support to start "
+            "the recovery process now?"
+        )
     if intent == "session_timeout":
         return (
             "Your session times out after 30 minutes of inactivity — for "
@@ -2132,6 +2290,12 @@ _INTENT_TO_MATCH_TYPE = {
     "loan_transfer": "intent_loan_transfer",
     "validator_locations": "intent_validator_locations",
     "historical_snapshot": "intent_historical_snapshot",
+    # Set 15
+    "otc_settlement_currency": "intent_otc_settlement_currency",
+    "temporary_deactivation": "intent_temporary_deactivation",
+    "collateral_revaluation": "intent_collateral_revaluation",
+    "tax_withholding": "intent_tax_withholding",
+    "account_recovery": "intent_account_recovery",
     # Short yes/no — map to generic intent types so the widget can
     # still render actions the usual way.
     "affirmation": "intent_affirmation",
