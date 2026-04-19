@@ -60,6 +60,20 @@ Intent = Literal[
     "ltv_calculation",
     "rewards_history",
     "session_timeout",
+    # ─── Sets 7 + 8 + 9 (13 more) ───────────────────────────────
+    "claim_rewards",
+    "interest_payment",
+    "shared_account",
+    "cancel_otc",
+    "otc_max_size",
+    "tin_required",
+    "add_collateral",
+    "ip_whitelisting",
+    "negotiate_rate",
+    "loan_default",
+    "validator_diversification",
+    "monthly_statements",
+    "liquidation_details",
     "navigate_staking",
     "navigate_lending",
     "navigate_custody",
@@ -320,18 +334,21 @@ _STAKING_FEES_RE = re.compile(
     re.I,
 )
 
-# Frequency / schedule of staking payouts
+# Frequency / schedule of staking payouts. Also absorbs James's
+# Set 8 "what time are rewards paid?" phrasing — the reply already
+# says "00:00 UTC daily" which answers both.
 _STAKING_FREQUENCY_RE = re.compile(
     r"\b("
     r"how\s+(often|frequently)\s+(do\s+you\s+)?(pay|distribute)\s+(staking\s+)?rewards?|"
-    # "how often [are] rewards paid" — no "are" also works
     r"how\s+(often|frequently)\s+(are\s+)?(staking\s+)?rewards?\s+(paid|distributed|credited)|"
     r"how\s+(often|frequently)\s+(are\s+)?(staking\s+)?(paid|distributed|credited)|"
     r"when\s+(are|do)\s+(staking\s+)?rewards?\s+(paid|distributed|credited)|"
-    r"(staking\s+)?rewards?\s+(paid|distributed|credited)\s+(daily|weekly|hourly)|"
-    r"(staking\s+)?payout\s+(schedule|frequency|interval)|"
+    r"what\s+time\s+(are\s+|do\s+)?(staking\s+)?rewards?\s+(paid|distributed|credited)|"
+    r"(staking\s+)?rewards?\s+(paid|distributed|credited)\s+(daily|weekly|hourly|at\s+\d|same\s+time)|"
+    r"(staking\s+)?payout\s+(schedule|frequency|interval|time)|"
     r"rewards?\s+(schedule|frequency|interval)|"
-    r"daily\s+or\s+weekly|hourly\s+or\s+daily"
+    r"daily\s+or\s+weekly|hourly\s+or\s+daily|"
+    r"same\s+time\s+every\s+day"
     r")\b",
     re.I,
 )
@@ -529,7 +546,12 @@ _INTERNAL_TRANSFER_RE = re.compile(
     r"internal\s+transfer|"
     r"wallet[\s-]to[\s-]wallet\s+transfer|"
     r"move\s+(crypto|funds|balance).*between.*(my\s+)?(own\s+)?wallets?|"
-    r"transfer\s+within\s+al.?fardan"
+    r"transfer\s+within\s+al.?fardan|"
+    # James Set 7 — custody<->staking / lending / otc buckets are
+    # also internal transfers. Answer is same: instant + free.
+    r"(transfer|move|send).*between\s+(custody|staking|lending|otc)\s+(and|&|to|-|,)\s+(custody|staking|lending|otc)|"
+    r"how\s+long.*(transfer|move).*between\s+(custody|staking|lending|otc)|"
+    r"(custody|staking|lending|otc)\s+to\s+(custody|staking|lending|otc)"
     r")\b",
     re.I,
 )
@@ -648,6 +670,165 @@ _SESSION_TIMEOUT_RE = re.compile(
     re.I,
 )
 
+# ═════════════════════════════════════════════════════════════════════
+#  James QA Sets 7 + 8 + 9 (13 more intents)
+# ═════════════════════════════════════════════════════════════════════
+
+# "Is there a minimum amount to claim staking rewards?"
+_CLAIM_REWARDS_RE = re.compile(
+    r"\b("
+    r"(claim|claiming|collect)\s+(my\s+|staking\s+)?rewards?|"
+    r"minimum.*(to\s+)?claim\s+(staking\s+)?rewards?|"
+    r"(how\s+do\s+i|when\s+can\s+i)\s+(claim|collect)\s+(staking\s+)?rewards?"
+    r")\b",
+    re.I,
+)
+
+# "How do I pay the interest on my loan?" — existing loan management.
+# Outranks the generic loan_question / _START_LOAN_RE which ask about
+# opening a new loan.
+_INTEREST_PAYMENT_RE = re.compile(
+    r"\b("
+    r"(how\s+do\s+i|how\s+to)\s+pay\s+(the\s+|my\s+)?interest|"
+    r"pay(ing)?\s+(the\s+|my\s+)?(loan\s+)?interest|"
+    r"interest\s+payment|"
+    r"pay\s+(my\s+|the\s+)?(loan\s+)?(interest|profit|cost)\s+(with|in)\s+(crypto|btc|eth|usdt|usdc|dai|stablecoins?)|"
+    r"make\s+(a\s+|my\s+)?(loan\s+)?interest\s+payment"
+    r")\b",
+    re.I,
+)
+
+# "Can I have a shared custody account?" — must outrank navigate_custody.
+_SHARED_ACCOUNT_RE = re.compile(
+    r"\b("
+    r"shared\s+(custody\s+)?account|"
+    r"joint\s+(custody\s+)?account|"
+    r"account\s+(with\s+)?(another\s+person|my\s+(wife|husband|partner|spouse|kids?|children|family))|"
+    r"(add|register)\s+(another\s+|a\s+second\s+)?owner|"
+    r"co[\s-]?own(er|ership)\s+(account|custody)"
+    r")\b",
+    re.I,
+)
+
+# "Can I cancel an OTC trade after confirming?"
+_CANCEL_OTC_RE = re.compile(
+    r"\b("
+    r"cancel\s+(an?\s+|my\s+|the\s+)?otc\s+(trade|order|quote)|"
+    r"reverse\s+(an?\s+|my\s+|the\s+)?otc\s+(trade|order)|"
+    r"otc\s+(trade|order)\s+cancel|"
+    r"undo\s+(an?\s+|my\s+|the\s+)?otc\s+(trade|order)|"
+    r"back\s+out\s+(of\s+)?(an?\s+|my\s+|the\s+)?(otc\s+)?(trade|order)"
+    r")\b",
+    re.I,
+)
+
+# "Is there a maximum OTC trade size?"
+_OTC_MAX_SIZE_RE = re.compile(
+    r"\b("
+    r"maximum\s+otc\s+(trade|ticket|size|limit)|"
+    r"(largest|biggest|max)\s+(otc\s+)?(trade|ticket|order)|"
+    r"otc\s+(max|maximum|largest|biggest|cap|ceiling)\s+(size|limit|trade)?|"
+    r"trade\s+more\s+than\s+(\$\s?\d|\d+\s*(m|million))"
+    r")\b",
+    re.I,
+)
+
+# "Do I need to provide a tax identification number?"
+_TIN_REQUIRED_RE = re.compile(
+    r"\b("
+    r"(tax\s+identification|tax\s+id|tin)\s+(required|needed|necessary|mandatory)|"
+    r"(provide|submit|give)\s+(my\s+|a\s+)?(tax\s+identification|tax\s+id|tin)|"
+    r"(need|require).*(tax\s+identification|tax\s+id|tin)|"
+    r"(tax\s+identification|tax\s+id|tin)\s+(to\s+open|for\s+opening|for\s+kyc)"
+    r")\b",
+    re.I,
+)
+
+# "How do I add more collateral to an existing loan?" — existing
+# loan management, MUST outrank _START_LOAN_RE.
+_ADD_COLLATERAL_RE = re.compile(
+    r"\b("
+    r"(add|top\s*up|topup|increase)\s+(more\s+)?(my\s+|the\s+)?collateral|"
+    r"add\s+collateral\s+to\s+(an?\s+|my\s+|the\s+)?(existing\s+)?loan|"
+    r"increase\s+(my\s+|the\s+)?(loan\s+)?collateral|"
+    r"post\s+more\s+collateral|"
+    r"reduce\s+(my\s+|the\s+)?ltv\s+(by|with|using)\s+(more\s+)?collateral"
+    r")\b",
+    re.I,
+)
+
+# "Can I restrict logins to specific IP addresses?" — distinct from
+# the withdrawal-address whitelist (which is for outbound addresses).
+_IP_WHITELISTING_RE = re.compile(
+    r"\b("
+    r"(restrict|limit|lock)\s+(my\s+)?(logins?|sign[\s-]?ins?|access)\s+(to\s+)?(specific\s+|certain\s+)?ip(\s+address)?|"
+    r"ip\s+(whitelist|whitelisting|white[\s-]?listed?|restrict|restriction|lock|filter)|"
+    r"(allow|accept)\s+logins?\s+only\s+from\s+(specific\s+|certain\s+)?ip|"
+    r"(login|sign[\s-]?in|access)\s+ip\s+(whitelist|restrict|lock)"
+    r")\b",
+    re.I,
+)
+
+# "Can I negotiate the interest rate on a large loan?"
+_NEGOTIATE_RATE_RE = re.compile(
+    r"\b("
+    r"negotiate\s+(the\s+|my\s+|a\s+)?(interest\s+)?rate|"
+    r"(better|custom|bespoke|tailored|preferential|lower)\s+(interest\s+)?rate|"
+    r"(can|will)\s+you\s+(offer|give|provide)\s+(me\s+)?(a\s+)?(better|lower|custom|preferential)\s+(interest\s+)?rate|"
+    r"rate\s+negotiation"
+    r")\b",
+    re.I,
+)
+
+# "What happens if I don't repay my loan at all?"
+_LOAN_DEFAULT_RE = re.compile(
+    r"\b("
+    r"(don't|do\s+not|never|fail\s+to|can'?t|cannot|unable\s+to)\s+repay\s+(my\s+)?loan|"
+    r"loan\s+(default|defaults|defaulting|unpaid|non[\s-]?repayment)|"
+    r"what\s+(if|happens\s+if)\s+(i\s+)?(don't|do\s+not|can'?t|never|fail)\s+(pay|repay)|"
+    r"default\s+on\s+(my\s+|the\s+)?loan|"
+    r"miss\s+(a\s+|my\s+|the\s+)?loan\s+payment"
+    r")\b",
+    re.I,
+)
+
+# "Are my staked assets spread across multiple validators?"
+_VALIDATOR_DIVERSIFICATION_RE = re.compile(
+    r"\b("
+    r"(multiple|many|several|different)\s+validators|"
+    r"(spread|distributed|diversified)\s+(my\s+)?(staked\s+)?(stake|assets|funds)|"
+    r"validator\s+(diversif|spread|distribution)|"
+    r"how\s+many\s+validators|"
+    r"single\s+validator\s+(risk|concentration|expose)"
+    r")\b",
+    re.I,
+)
+
+# "Do you provide monthly custody statements?"
+_MONTHLY_STATEMENTS_RE = re.compile(
+    r"\b("
+    r"(monthly|weekly|quarterly|annual|yearly)\s+(custody\s+|account\s+)?statements?|"
+    r"(custody\s+|account\s+)?statements?\s+(monthly|weekly|quarterly|annual|yearly)|"
+    r"(provide|get|download|receive)\s+(my\s+|a\s+)?(monthly\s+|weekly\s+|quarterly\s+|custody\s+|account\s+)?statement|"
+    r"custody\s+statement"
+    r")\b",
+    re.I,
+)
+
+# "What happens during liquidation?" — distinct from margin-call.
+# Focuses on the ACT of liquidation: how much, how it's executed.
+_LIQUIDATION_DETAILS_RE = re.compile(
+    r"\b("
+    r"what\s+happens\s+during\s+liquidation|"
+    r"liquidation\s+(process|fee|cost|amount|how|executes?|steps)|"
+    r"how\s+much.*(do\s+i|will\s+i)\s+lose\s+(during|on|in)\s+liquidation|"
+    r"(process|steps)\s+of\s+liquidation|"
+    r"partial\s+liquidation|"
+    r"how\s+does\s+liquidation\s+work"
+    r")\b",
+    re.I,
+)
+
 
 def classify(text: str) -> Intent:
     """Return the most specific matching intent or 'unknown'.
@@ -684,10 +865,17 @@ def classify(text: str) -> Intent:
     #   - withdrawing staking rewards specifically
     if _WHITELIST_ADDRESS_RE.search(text):
         return "whitelist_address"
+    # IP whitelisting is also checked before withdraw since the user
+    # might phrase it as "whitelist IPs for login" and we'd otherwise
+    # mis-route to address whitelist.
+    if _IP_WHITELISTING_RE.search(text):
+        return "ip_whitelisting"
     if _INTERNAL_TRANSFER_RE.search(text):
         return "internal_transfer"
     if _STAKING_REWARDS_WITHDRAW_RE.search(text):
         return "staking_rewards_withdraw"
+    if _CLAIM_REWARDS_RE.search(text):
+        return "claim_rewards"
     # Security incident must outrank every nav — "my account is hacked"
     # shouldn't just drop the user on /settings, they need the
     # emergency flow.
@@ -705,6 +893,12 @@ def classify(text: str) -> Intent:
         return "deposit_request"
     if _GOTO_PORTFOLIO_RE.search(text):
         return "navigate_portfolio"
+    # OTC-specific asks beat navigate_otc because they need bespoke
+    # answers, not a generic OTC intro.
+    if _CANCEL_OTC_RE.search(text):
+        return "cancel_otc"
+    if _OTC_MAX_SIZE_RE.search(text):
+        return "otc_max_size"
     if _GOTO_OTC_RE.search(text):
         return "navigate_otc"
     # custody_minimum_balance must outrank _GOTO_CUSTODY_RE — "minimum
@@ -712,6 +906,12 @@ def classify(text: str) -> Intent:
     # the generic navigate_custody reply instead of the specific answer.
     if _CUSTODY_MINIMUM_BALANCE_RE.search(text):
         return "custody_minimum_balance"
+    # shared_account + monthly_statements also mention "custody" or
+    # "account" and would hijack the nav route otherwise.
+    if _SHARED_ACCOUNT_RE.search(text):
+        return "shared_account"
+    if _MONTHLY_STATEMENTS_RE.search(text):
+        return "monthly_statements"
     if _GOTO_CUSTODY_RE.search(text):
         return "navigate_custody"
     if _GOTO_SETTINGS_RE.search(text):
@@ -805,6 +1005,23 @@ def classify(text: str) -> Intent:
         return "rewards_history"
     if _SESSION_TIMEOUT_RE.search(text):
         return "session_timeout"
+    # ─── Sets 7/8/9 — all must beat the generic topic routes ─────
+    if _CLAIM_REWARDS_RE.search(text):
+        return "claim_rewards"
+    if _INTEREST_PAYMENT_RE.search(text):
+        return "interest_payment"
+    if _ADD_COLLATERAL_RE.search(text):
+        return "add_collateral"
+    if _NEGOTIATE_RATE_RE.search(text):
+        return "negotiate_rate"
+    if _LOAN_DEFAULT_RE.search(text):
+        return "loan_default"
+    if _TIN_REQUIRED_RE.search(text):
+        return "tin_required"
+    if _VALIDATOR_DIVERSIFICATION_RE.search(text):
+        return "validator_diversification"
+    if _LIQUIDATION_DETAILS_RE.search(text):
+        return "liquidation_details"
     if _API_KEY_MANAGEMENT_RE.search(text):
         return "api_key_management"
     if _LOAN_Q_RE.search(text):
@@ -1060,10 +1277,12 @@ def scripted_reply(intent: Intent) -> str | None:
             "Yes, you can close your account once balances are zero and any "
             "active loans / staking positions are settled. Email "
             "support@alfardanq9.com to request closure and we'll process it "
-            "within 3 UAE business days. Data retention: most personal data "
-            "is deleted on closure, but transaction records are retained for "
-            "5-7 years per UAE AML regulations. Would you like me to send "
-            "you our full data retention policy?"
+            "within 3 UAE business days. No — a closed account cannot be "
+            "reopened; the email is retired and you would need to create a "
+            "new account if you want to come back later. Data retention: "
+            "most personal data is deleted on closure, but transaction "
+            "records are retained for 5-7 years per UAE AML regulations. "
+            "Would you like me to send you our full data retention policy?"
         )
     if intent == "early_repayment":
         return (
@@ -1189,6 +1408,142 @@ def scripted_reply(intent: Intent) -> str | None:
             "and export to CSV for your accountant. History goes back to "
             "the start of your first stake on each network. Would you like "
             "me to help you export your rewards history?"
+        )
+    # ─── Sets 7/8/9 replies ──────────────────────────────────────
+    if intent == "claim_rewards":
+        return (
+            "No, there is no minimum amount to claim staking rewards. "
+            "Rewards of any size — even fractional amounts — are eligible. "
+            "They're also distributed automatically daily at 00:00 UTC to "
+            "your segregated custodial account, so you don't have to claim "
+            "them manually. Would you like me to help you check your "
+            "available rewards?"
+        )
+    if intent == "interest_payment":
+        return (
+            "Interest is deducted automatically each month from your "
+            "available custody balance — no manual action needed for the "
+            "standard cycle. To make an ad-hoc payment, go to Lending → "
+            "Active Loans → Pay Interest. Yes, you can pay in crypto — "
+            "USDC, USDT, BTC, and ETH are accepted at the current spot "
+            "rate. Would you like me to help you make an interest payment?"
+        )
+    if intent == "shared_account":
+        return (
+            "No, custody accounts are individual and can't be jointly "
+            "owned. For family-office / corporate setups, we support sub-"
+            "users under a single entity account — each with scoped "
+            "permissions (view-only, trade, withdraw) so spouses / "
+            "directors / finance staff can operate without giving anyone "
+            "full control. Would you like me to explain how to set up "
+            "sub-user access?"
+        )
+    if intent == "cancel_otc":
+        return (
+            "No, once you confirm an OTC trade it's binding and cannot be "
+            "cancelled — we've already hedged with market makers on your "
+            "acceptance. Before confirming you get a firm quote valid for "
+            "15 minutes where the price is locked; use that window to "
+            "double-check size and direction. Would you like me to walk "
+            "you through the confirmation flow so nothing slips?"
+        )
+    if intent == "otc_max_size":
+        return (
+            "Our standard maximum OTC trade size is USD 50 million per "
+            "ticket. For trades above $50M we can absolutely accommodate "
+            "— please contact your relationship manager or the OTC desk "
+            "24-48 hours in advance so we can pre-stage liquidity and "
+            "give you a firm (not indicative) quote. Our largest single "
+            "execution to date is over $50M, and we've done blocks up to "
+            "several hundred million with advance notice. What size are "
+            "you looking at?"
+        )
+    if intent == "tin_required":
+        return (
+            "Yes, for institutional / corporate accounts we require a tax "
+            "identification number (TIN) or equivalent as part of KYC — "
+            "the exact form depends on the entity's jurisdiction (EIN for "
+            "US, trade licence for UAE, CRN for UK, etc.). For individual "
+            "accounts your passport or Emirates ID number is sufficient. "
+            "Would you like me to explain the full KYC document list for "
+            "your account type?"
+        )
+    if intent == "add_collateral":
+        return (
+            "To add more collateral to an existing loan: go to Lending → "
+            "Active Loans → click your loan → 'Add Collateral'. Choose "
+            "the asset (BTC or ETH) and amount, confirm with 2FA, and the "
+            "additional collateral pledges to the Fireblocks escrow "
+            "immediately — your LTV drops instantly. No fee for top-ups. "
+            "Would you like me to help you add collateral right now?"
+        )
+    if intent == "ip_whitelisting":
+        return (
+            "Yes, you can restrict logins to specific IP addresses. Go to "
+            "Settings → Security → IP Whitelist, add the IPs or CIDR "
+            "ranges you want to allow, and save with 2FA. From then on, "
+            "sign-ins from any IP outside the list are blocked and you get "
+            "an email alert. We also offer device-fingerprint anomaly "
+            "detection even without IP whitelist enabled. Would you like "
+            "me to help you set this up?"
+        )
+    if intent == "negotiate_rate":
+        return (
+            "Yes, interest rates are negotiable for larger loans. Our "
+            "published tiers: Starter (<$1M) 4.9% APR, Core 4.5%, Pro "
+            "4.2%, Institutional ($1M+, 5-year) 3.25-3.9%. For loans "
+            "above $5M we run custom pricing through our credit committee "
+            "— bespoke rates tied to collateral quality, loan purpose, "
+            "and relationship depth. Would you like me to connect you "
+            "with our lending desk to discuss your specific requirements?"
+        )
+    if intent == "loan_default":
+        return (
+            "If you don't repay at maturity we follow a staged process: "
+            "(1) You receive reminders at 30, 14, and 7 days before "
+            "maturity. (2) At maturity we attempt a collateral-level "
+            "margin call via email + phone. (3) If no action within "
+            "the cure window, we liquidate collateral through our OTC "
+            "desk to recover the outstanding principal + accrued cost + "
+            "a 1% default fee. (4) Any excess collateral returns to your "
+            "custody vault; any shortfall is logged as a personal "
+            "liability. Default also flags your future-borrowing "
+            "eligibility with us. Would you like me to explain the "
+            "liquidation mechanics in more detail?"
+        )
+    if intent == "validator_diversification":
+        return (
+            "Yes, your staked assets are distributed across multiple "
+            "validators — we never concentrate more than 10% of any "
+            "client's position with a single validator. This reduces "
+            "correlated slashing risk and keeps uptime high if one "
+            "validator has an issue. For clients staking above $5M per "
+            "network we can discuss dedicated validator routing with "
+            "your relationship manager. Would you like me to explain our "
+            "validator selection methodology in more detail?"
+        )
+    if intent == "monthly_statements":
+        return (
+            "Yes, we provide monthly custody statements automatically. "
+            "Go to Wallets → Statements, pick the month (or a custom "
+            "range), and download as PDF or CSV. Each statement includes "
+            "opening and closing balances per asset, all transactions for "
+            "the period, staking rewards, fees, and our custody "
+            "attestation stamp. Would you like me to help you download "
+            "your latest statement?"
+        )
+    if intent == "liquidation_details":
+        return (
+            "Liquidation is PARTIAL — we never auto-liquidate your full "
+            "collateral, only the minimum needed to bring LTV back to a "
+            "safe level (60%). Execution happens through our OTC desk, "
+            "not a retail exchange, which minimises slippage on large "
+            "positions. A 1% liquidation fee applies to the liquidated "
+            "portion. Example: on a $30K loan against 1 BTC at $42K "
+            "(LTV 71%), if BTC falls further to trigger liquidation, we "
+            "might sell ~0.15 BTC — you keep the rest plus any remaining "
+            "equity after loan payoff. Would you like me to calculate a "
+            "liquidation scenario for your position?"
         )
     if intent == "session_timeout":
         return (
@@ -1354,6 +1709,20 @@ _INTENT_TO_MATCH_TYPE = {
     "ltv_calculation": "intent_ltv_calculation",
     "rewards_history": "intent_rewards_history",
     "session_timeout": "intent_session_timeout",
+    # Sets 7/8/9
+    "claim_rewards": "intent_claim_rewards",
+    "interest_payment": "intent_interest_payment",
+    "shared_account": "intent_shared_account",
+    "cancel_otc": "intent_cancel_otc",
+    "otc_max_size": "intent_otc_max_size",
+    "tin_required": "intent_tin_required",
+    "add_collateral": "intent_add_collateral",
+    "ip_whitelisting": "intent_ip_whitelisting",
+    "negotiate_rate": "intent_negotiate_rate",
+    "loan_default": "intent_loan_default",
+    "validator_diversification": "intent_validator_diversification",
+    "monthly_statements": "intent_monthly_statements",
+    "liquidation_details": "intent_liquidation_details",
     # Short yes/no — map to generic intent types so the widget can
     # still render actions the usual way.
     "affirmation": "intent_affirmation",

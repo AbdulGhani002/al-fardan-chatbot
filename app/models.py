@@ -84,6 +84,20 @@ MatchType = Literal[
     "intent_ltv_calculation",
     "intent_rewards_history",
     "intent_session_timeout",
+    # Sets 7/8/9
+    "intent_claim_rewards",
+    "intent_interest_payment",
+    "intent_shared_account",
+    "intent_cancel_otc",
+    "intent_otc_max_size",
+    "intent_tin_required",
+    "intent_add_collateral",
+    "intent_ip_whitelisting",
+    "intent_negotiate_rate",
+    "intent_loan_default",
+    "intent_validator_diversification",
+    "intent_monthly_statements",
+    "intent_liquidation_details",
     "system_error",
 ]
 
