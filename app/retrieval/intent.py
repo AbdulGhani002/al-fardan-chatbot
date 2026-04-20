@@ -1503,59 +1503,60 @@ def scripted_reply(intent: Intent) -> str | None:
         )
     if intent == "navigate_staking":
         return (
-            "Great — staking earns you institutional-grade yield (~4% APY on ETH, "
-            "~6-7% on SOL) with no lock-up. Minimum is 1 ETH or 1 SOL. Tap "
-            "\"Open Staking\" below to go straight to the Staking page and start "
-            "a new position."
+            "Al-Fardan Q9 offers institutional staking on ETH, SOL, POL, ADA, "
+            "DOT, AVAX, and ATOM. APY is published net of our 15% reward "
+            "commission. The Staking page in your client portal provides the "
+            "live rates and position controls."
         )
     if intent == "navigate_lending":
         return (
-            "Our lending is a Shariah-compliant Murabaha credit line backed by "
-            "your BTC or ETH, with up to 75% LTV — among the highest in "
-            "institutional crypto lending. Rates start at 3.25% APR for 5-year "
-            "terms (min $25K). If the collateral price drops, you receive a "
-            "margin call at 85% LTV with 24 hours to top up or partially repay "
-            "before any liquidation. Tap \"Open Lending\" to start, or \"Loan "
-            "Calculator\" to see what you qualify for first."
+            "Al-Fardan Q9 provides Shariah-compliant Murabaha credit lines "
+            "collateralised by BTC or ETH. Maximum LTV is 75%. Rates begin at "
+            "3.25% APR for five-year terms; minimum loan size USD 25,000. "
+            "Collateral-protection thresholds: margin call at 85% LTV with a "
+            "24-hour cure window before any partial liquidation at 90% LTV. "
+            "The Lending page and calculator are accessible via your client "
+            "portal."
         )
     if intent == "navigate_custody":
         return (
-            "Custody is our segregated, Lloyd's-insured Fireblocks vault — 1:1 "
-            "cold storage with no monthly fees. Tap \"Open Custody\" to see your "
-            "custody balances or start a deposit."
+            "Custody operates on Fireblocks MPC-CMP infrastructure — "
+            "segregated vaults, no commingling with corporate funds, covered "
+            "by our Lloyd's of London policy. The Custody module in your "
+            "client portal provides balances and deposit addresses."
         )
     if intent == "navigate_otc":
         return (
-            "Our OTC Desk handles block trades from USD 100,000 to USD 50M+. "
-            "Typical spreads are 5 to 25 bps depending on asset and size. "
-            "Crypto settlement completes within 1-4 hours; fiat wires within "
-            "24 hours — same-day crypto is standard. Tap \"Open OTC Desk\" to "
-            "request a firm quote."
+            "The OTC Desk handles block trades between USD 100,000 and "
+            "USD 50 million per ticket; larger size is accommodated with "
+            "24-48 hours' advance notice. Spreads range from 5 to 25 basis "
+            "points depending on asset and size. Crypto settlement completes "
+            "within 1 to 4 hours; fiat via SWIFT within 24 hours. Quote "
+            "requests are placed through the OTC Desk module."
         )
     if intent == "navigate_portfolio":
         return (
-            "Your Portfolio page consolidates every asset you hold across Custody, "
-            "Staking, OTC, and Lending collateral — with live USD values. Tap "
-            "\"Open Portfolio\" to see it."
+            "The Portfolio module consolidates positions across Custody, "
+            "Staking, OTC, and Lending collateral, with live fiat valuations."
         )
     if intent == "navigate_settings":
         return (
-            "In Settings you can update profile, change password, enable 2FA, "
-            "whitelist addresses, and download tax statements. Tap \"Open "
-            "Settings\" below."
+            "Account settings — profile, password, 2FA, address whitelisting, "
+            "and statement downloads — are managed from the Settings module "
+            "in your client portal."
         )
     if intent == "navigate_wallets":
         return (
-            "Your Wallets page is where you deposit, withdraw, and see "
-            "transaction history per asset. Tap \"Open Wallets\" to jump there."
+            "The Wallets module provides per-asset deposit, withdrawal, and "
+            "transaction-history views within the client portal."
         )
     if intent == "withdraw_request":
         return (
-            "Withdrawals are initiated from your Wallets page. Enter the "
-            "destination address and amount, confirm with 2FA — admin reviews "
-            "within 1 hour during UAE business hours. Typical processing: "
-            "1-4 hours for crypto, 24 hours for fiat wires. Tap \"Open Wallets\" "
-            "below to start a withdrawal."
+            "Withdrawals are initiated from the Wallets module: destination "
+            "address, amount, and 2FA confirmation. Requests undergo admin "
+            "review (typically within one hour during UAE business hours) "
+            "before on-chain broadcast. Total processing: 1 to 4 hours for "
+            "crypto, 24 hours for fiat wires."
         )
     if intent == "withdrawal_delay":
         return (
@@ -1649,14 +1650,13 @@ def scripted_reply(intent: Intent) -> str | None:
         )
     if intent == "transfer_from_exchange":
         return (
-            "To move crypto from another exchange into Al-Fardan Q9: (1) go "
-            "to Wallets → pick the asset → Deposit to see your unique "
-            "Fireblocks deposit address (and a QR code). (2) On the other "
-            "exchange, initiate a withdrawal to that exact address on the "
-            "matching network (e.g. BTC mainnet, ETH ERC-20). (3) Send a "
-            "small test amount first — crypto transactions are irreversible. "
-            "Auto-credit happens after 3 on-chain confirmations. Would you "
-            "like me to walk you through this step by step?"
+            "To transfer crypto from another exchange into Al-Fardan Q9: "
+            "(1) open the Wallets module, select the asset, and retrieve "
+            "your Fireblocks deposit address. (2) Initiate the withdrawal "
+            "from the source exchange to that address on the matching "
+            "network (e.g. BTC mainnet, ETH ERC-20). (3) Send a small test "
+            "amount first — on-chain transactions are irreversible. Funds "
+            "credit to your account after three network confirmations."
         )
     if intent == "otc_quote_validity":
         return (
@@ -1719,15 +1719,25 @@ def scripted_reply(intent: Intent) -> str | None:
             "relationship manager. Would you like me to explain how our "
             "validator selection process works?"
         )
+    if intent == "deposit_request":
+        return (
+            "Deposits are managed from the Wallets module. Select the asset, "
+            "retrieve your unique Fireblocks deposit address or QR code, and "
+            "send from your external wallet on the matching network. Funds "
+            "auto-credit after three on-chain confirmations."
+        )
     if intent == "security_incident":
         return (
-            "I hear you — this is urgent. Take these steps immediately: "
-            "(1) change your password in Settings → Security, (2) revoke any "
-            "API keys you don't recognise, (3) enable 2FA if it isn't "
-            "already, (4) email security@alfardanq9.com or call our 24/7 "
-            "emergency line at +971 4 123 4568 right now. Please do NOT "
-            "dismiss any unfamiliar alerts. Would you like me to connect you "
-            "with the security team this minute?"
+            "Please take the following actions immediately. (1) Change your "
+            "password via Settings → Security. (2) Revoke any API keys you "
+            "do not recognise. (3) Enable 2FA if it is not already active. "
+            "(4) Contact our security team at security@alfardanq9.com or "
+            "the 24/7 emergency line at +971 4 123 4568. Do not dismiss "
+            "unfamiliar alerts.\n\n"
+            "Al-Fardan Q9 custody is held in segregated Fireblocks MPC "
+            "vaults and covered by our Lloyd's of London insurance policy. "
+            "Account-level events are escalated by the security team within "
+            "regulatory notification timelines."
         )
     # ─── Set 5 replies ───────────────────────────────────────────
     if intent == "loan_extension":
@@ -2181,32 +2191,30 @@ def scripted_reply(intent: Intent) -> str | None:
             "like me to help you set up an API key?"
         )
     if intent == "deposit_request":
+        # Dead code path — the earlier `if intent == "deposit_request"`
+        # branch already returns. Retained only for readability.
         return (
-            "Deposits: go to Wallets → pick your asset → copy the deposit address "
-            "(or scan the QR) and send from your external wallet. Auto-credits "
-            "after 3 network confirmations. Tap \"Open Wallets\" below."
+            "Deposits are managed from the Wallets module. Select the asset, "
+            "retrieve your unique Fireblocks deposit address or QR code, and "
+            "send from your external wallet on the matching network. Funds "
+            "auto-credit after three network confirmations."
         )
     if intent == "contact_support":
         return (
-            "I'll route you to a human. The fastest options: email "
-            "support@alfardanq9.com (response under 2 UAE business hours), or "
-            "submit a ticket from Settings → Support. For urgent security issues "
-            "call +971-4-xxx-xxxx. Tap \"Open Support\" below to raise a ticket."
+            "Our client desk is reachable at institutional@alfardanq9.com — "
+            "typical response within 2 UAE business hours. For urgent "
+            "security or withdrawal matters use the 24/7 line at "
+            "+971 4 123 4568."
         )
     if intent == "affirmation":
-        # We don't track conversation state yet, so we can't know what
-        # the user is affirming. Give a warm continuation prompt + quick
-        # paths into the common flows.
+        # vary.py handles the active pool; this is the fallback when
+        # pick_variant returns None.
         return (
-            "Great — happy to help. What would you like to do next? "
-            "Open an account, see our products, or ask something specific?"
+            "Understood. Please specify the topic you would like me to "
+            "address."
         )
     if intent == "negation":
-        return (
-            "No worries — take your time. What else can I help with? "
-            "I can explain products, fees, or how we're regulated. "
-            "Whatever's useful."
-        )
+        return "Understood."
     return None
 
 

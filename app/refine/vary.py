@@ -1,13 +1,15 @@
-"""Response variety for scripted intent replies.
+"""Response variety for scripted intent replies — institutional register.
 
-Human conversations don't repeat verbatim. When a user says "hi"
-three times in a row they shouldn't get the same 40-word intro each
-time. This module returns a randomly-picked phrasing from a small
-pool per intent.
+Every variant follows the Institutional Voice Protocol:
+  - Direct, factual, minimal framing
+  - No hype tokens (perfect, great, happy to help, awesome, absolutely,
+    fully insured, guaranteed, best)
+  - No emojis, no exclamation marks
+  - No retail CTAs ("want me to…", "shall I…", "ping me")
+  - No upsell unless the user explicitly asked
 
-Stateless — no session awareness at this layer. The session cache
-in main.py handles continuity; this just breaks up the "every reply
-feels identical" tell that makes chatbots feel canned.
+Persona: Safiya Al Suwaidi — Institutional Client Advisor at
+Al-Fardan Q9. Register: private banking / DIFC advisor.
 """
 
 from __future__ import annotations
@@ -16,103 +18,93 @@ import random
 
 
 # Per-intent template pools. Each variant is self-contained — the
-# caller picks one at random per reply. Keep each under ~50 words so
-# the bot stays concise.
+# caller picks one at random per reply.
 
 GREETING_VARIANTS = (
-    "Assalamu alaikum — I'm Safiya Al Suwaidi, Client Acquisition & "
-    "Growth Manager at Al-Fardan Q9. I help new investors get started "
-    "with Custody, Staking, OTC, and Lending. What brings you here today?",
+    "Assalamu alaikum. Safiya Al Suwaidi, Institutional Client Advisor "
+    "at Al-Fardan Q9. How can I help today?",
 
-    "Hi — Safiya Al Suwaidi here. I'm Client Acquisition & Growth "
-    "Manager at Al-Fardan Q9. Whether it's custody, staking, OTC, or "
-    "lending, happy to help. What are you looking into?",
+    "Good day. Safiya Al Suwaidi here, Institutional Client Advisor, "
+    "Al-Fardan Q9. What would you like to discuss?",
 
-    "Hey — I'm Safiya, Client Acquisition & Growth Manager at Al-Fardan "
-    "Q9. I help new investors navigate the platform. What can I help "
-    "with today?",
+    "Welcome to Al-Fardan Q9. I'm Safiya Al Suwaidi, Institutional "
+    "Client Advisor. Please go ahead with your question.",
 
-    "Welcome to Al-Fardan Q9. I'm Safiya Al Suwaidi, your starting "
-    "point — Custody, Staking, OTC, Lending, or something else on your "
-    "mind?",
+    "Safiya Al Suwaidi, Al-Fardan Q9 Institutional Client Advisor. "
+    "How may I assist.",
 )
 
 GOODBYE_VARIANTS = (
-    "Take care — I'm here whenever you need. Urgent? "
-    "institutional@alfardanq9.com covers you 24/7.",
+    "Thank you. If you need further assistance, "
+    "institutional@alfardanq9.com is staffed 24/7.",
 
-    "Talk soon. Ping me anytime — or reach the desk directly at "
-    "institutional@alfardanq9.com.",
+    "Noted. Our team is available at institutional@alfardanq9.com "
+    "should you require further information.",
 
-    "All the best. I'll be right here when you're back; the 24/7 desk "
-    "is at institutional@alfardanq9.com.",
-
-    "Thanks for stopping by. Ping anytime — institutional@alfardanq9.com "
-    "is always staffed if it's urgent.",
+    "Thank you for your time. Al-Fardan Q9's client desk remains "
+    "available at institutional@alfardanq9.com.",
 )
 
 AFFIRMATION_VARIANTS = (
-    "Excellent — happy to help. What would you like to do next? "
-    "Open an account, review our products, or discuss something specific?",
+    "Understood. Please specify which product or policy you would "
+    "like me to address.",
 
-    "Perfect. How may I assist from here? I can walk you through signup, "
-    "explain a product in detail, or connect you with our desk.",
+    "Noted. Which area would you like to cover — Custody, Staking, "
+    "OTC, Lending, or compliance?",
 
-    "Understood — let's continue. What would you like to cover next? "
-    "A specific product, a number, or the onboarding flow?",
-
-    "Of course. Would you like me to walk you through the first step, "
-    "or is there a specific aspect you would like me to explain?",
+    "Acknowledged. Please indicate the specific topic.",
 )
 
 NEGATION_VARIANTS = (
-    "No concern — please take your time. What else may I help you with? "
-    "I can explain products, fees, or how we are regulated.",
+    "Understood. If you have further questions, please proceed.",
 
-    "Of course. Is there anything else I can clarify? Products, fees, "
-    "or our operating framework.",
+    "Noted. I remain available should you require information on "
+    "products, fees, or our regulatory framework.",
 
-    "Understood — no rush. If anything else comes to mind, I am here. "
-    "Would you like to explore another topic?",
-
-    "Absolutely. When you are ready, please ask. I can cover any "
-    "product, pricing structure, or compliance detail.",
+    "Acknowledged.",
 )
 
 SIGNUP_VARIANTS = (
-    "Happy to help you open an account — takes about 5 minutes. "
-    "Which service are you most interested in first?",
+    "Account onboarding follows our standard KYC process — identity "
+    "verification, source-of-funds declaration, and tier assignment. "
+    "Please indicate which product you intend to use (Custody, Staking, "
+    "OTC, or Lending) and I will route accordingly.",
 
-    "Great — let's get you set up. Name, email, phone, password, OTP "
-    "verification, then KYC. Which product drew you in?",
+    "To open an account, we require standard KYC documentation. "
+    "Individual clients: government ID, proof of address, and "
+    "source-of-funds declaration. Institutional clients: additional "
+    "entity documents. Which category applies.",
 
-    "Welcome aboard. Account creation is 5 minutes, KYC is 24-48 hours. "
-    "Which service should we centre the onboarding on?",
+    "Onboarding typically completes within 24-48 hours for individual "
+    "accounts, 3-5 business days for institutional accounts. Please "
+    "indicate which service you intend to use.",
 )
 
 CONTACT_SUPPORT_VARIANTS = (
-    "I'll route you to a human. Fastest options: email "
-    "institutional@alfardanq9.com (response under 2 UAE business hours) "
-    "or a ticket from Settings → Support.",
+    "Our client desk is reachable at institutional@alfardanq9.com. "
+    "Response time is typically within 2 UAE business hours. For "
+    "urgent matters, the 24/7 line is listed in your dashboard.",
 
-    "I can connect you with our team. Email institutional@alfardanq9.com "
-    "gets a reply within 2 UAE business hours. Urgent? The 24/7 line is "
-    "in your dashboard.",
+    "Please contact institutional@alfardanq9.com for non-urgent "
+    "matters, or the 24/7 line in your dashboard for time-sensitive "
+    "issues. For OTC execution, Layla Al-Fayez, Head of Institutional "
+    "OTC Desk, handles bespoke requests directly.",
 
-    "Let's get you a human. Email is fastest: institutional@alfardanq9.com. "
-    "Or file a ticket from Settings → Support. I'm also happy to take a "
-    "message for Layla if it's OTC-related.",
+    "For direct human assistance, email institutional@alfardanq9.com. "
+    "Urgent security or withdrawal matters should use the emergency "
+    "line at +971 4 123 4568.",
 )
 
 BALANCE_VARIANTS = (
-    "To see your balances, open your Portfolio or Wallets page in the "
-    "portal. Quick-access buttons below — tap one to jump straight "
-    "there.",
+    "Account balances are accessible through your Portfolio and "
+    "Wallets pages within the client portal.",
 
-    "Balances live on your Portfolio and Wallets pages. Links below.",
+    "Holdings are displayed on the Portfolio page (consolidated view) "
+    "and Wallets page (per-asset breakdown) within the client portal.",
 
-    "Your holdings are on the Portfolio page (aggregated) and Wallets "
-    "(per asset). Tap below to jump in.",
+    "Please access your client portal to review holdings. The "
+    "Portfolio page provides consolidated positioning; Wallets provides "
+    "per-asset detail.",
 )
 
 # Mapping intent name → tuple of variants. Keep in sync with intent.py.
