@@ -127,23 +127,22 @@ def detect(text: str) -> Mood:
 # ─── Pre-reply tone adjustments ─────────────────────────────────────
 
 def acknowledgment(mood: Mood) -> str:
-    """A short phrase to prepend to the main reply so the user feels
-    heard. Empty string if mood is neutral."""
+    """A short acknowledgement prepended to the main reply so the user
+    feels heard. Empty string if mood is neutral. Institutional
+    register — measured, not effusive, no retail warmth."""
     if mood.frustrated:
         return (
-            "I hear you — sorry this has been frustrating. "
-            "Let me try to make it useful. "
+            "Noted — apologies for the inconvenience. "
         )
     if mood.urgent:
         return (
-            "Got it — this sounds time-sensitive. "
-            "I'll be brief, and our 24/7 desk "
-            "(institutional@alfardanq9.com) can pick up immediately. "
+            "Understood — this appears time-sensitive. "
+            "The 24/7 desk (institutional@alfardanq9.com) is available for immediate escalation. "
         )
     if mood.confused:
-        return "No worries — let me keep it simple. "
+        return "Understood. "
     if mood.excited:
-        return "Love the energy. "
+        return ""
     return ""
 
 

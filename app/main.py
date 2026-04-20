@@ -163,21 +163,20 @@ def _shorten_scraped(text: str) -> str:
     return short
 
 
-# Follow-up question templates per category — appended to any answer
-# that doesn't already end with a question. Keeps the conversation
-# flowing instead of terminating on a declarative statement.
+# Follow-up prompts per category. Institutional Voice Protocol: no
+# retail CTAs ("want me to…", "shall I…"), no emotional closers. Only
+# category-specific continuation prompts that invite a precise follow-up
+# the client has a right to ask. Empty = no follow-up appended.
+#
+# Behavior Manual §8 and §9 — the chatbot should not chase engagement,
+# it should wait to be asked. Prefer silence over retail warmth.
 _FOLLOWUP_BY_CATEGORY: dict[str, str] = {
-    "lending": "Want me to price a specific loan for you?",
-    "staking": "Which network were you thinking about?",
-    "otc": "What size trade are you looking at?",
-    "custody": "Want to start with a small deposit to try it out?",
-    "onboarding": "Want me to walk you through the first step?",
-    "security": "Any specific concern I can go deeper on?",
-    "rwa": "Want to join the waiting list?",
-    "crypto": "Want me to explain how this applies to your situation?",
-    "company": "Anything else you'd like to know about us?",
-    "support": "What else can I help with?",
-    "pricing": "Want me to estimate the cost for your size?",
+    # Product topics where a single clarifying parameter is genuinely
+    # needed to move a conversation forward.
+    "lending":    "For an indicative quote, please confirm collateral asset and loan size.",
+    "staking":    "Please indicate which network is relevant to your mandate.",
+    "otc":        "Please share indicative trade size so we can route to the desk.",
+    # Everything else: no appended prompt. The answer stands on its own.
 }
 
 _CATEGORY_ALIASES = {
@@ -215,16 +214,23 @@ def _humanize_answer(entry, answer: str, query: str = "") -> str:
     through unchanged — they're already in Safiya's voice.
     """
     out = answer
-    # For any long answer where we have the query, pick the best
-    # sentences. Short curated answers pass through since
-    # extract_best_sentences is a no-op under its thresholds.
-    if query and len(out) > 300:
+    # Only aggressively extract sentences from SCRAPED content or genuinely
+    # long curated answers (>600 chars). Shorter institutional-register
+    # answers (300-600 chars, which is most of the KB) pass through
+    # untouched — sentence extraction on them was causing truncation at
+    # honorific boundaries (e.g. "Sheikh Dr.") and losing meaningful
+    # context ("MoU signed 10 Dec 2023" dropped from MoU entries).
+    if _is_scraped(entry):
+        if query:
+            out = extract_best_sentences(
+                out, query, n=3, max_chars=500, always_keep_first=True
+            )
+        else:
+            out = _shorten_scraped(out)
+    elif query and len(out) > 600:
         out = extract_best_sentences(
-            out, query, n=2, max_chars=360, always_keep_first=True
+            out, query, n=3, max_chars=520, always_keep_first=True
         )
-    elif _is_scraped(entry):
-        # Fallback for scraped entries when we don't have the query
-        out = _shorten_scraped(out)
 
     if not _ends_with_question(out):
         fu = _followup_for(getattr(entry, "category", ""))
@@ -530,17 +536,22 @@ def _session_previous_bot_turn(session_token: str) -> dict | None:
 
 
 def _build_contextual_query(session_token: str, current_message: str) -> str:
-    """For short follow-up queries ('yes', 'how much?', 'what about eth?')
-    augment with the previous user turn so the retriever sees enough
-    signal to find the right entry. For longer messages we pass through
-    unchanged — they already have enough context on their own.
+    """Augment VERY short follow-ups ('yes', 'how much?', 'more details')
+    with the previous user turn so the retriever has enough signal.
+
+    Only 1-3 word messages qualify. A 4+ word message is already a
+    specific question — augmenting it can cause the previous topic to
+    dominate retrieval and lock the bot onto the prior entry. Classic
+    bug: user asks "Is Al-Fardan Q9 Sharia-compliant?" then "What is
+    your Proof of Reserves?" — with the old 6-word threshold, the
+    second question was augmented into "Sharia … Proof of Reserves"
+    and retrieval re-served the Sharia entry.
     """
-    if len(current_message.split()) > 6:
+    if len(current_message.split()) > 3:
         return current_message
     turns = _session_get_turns(session_token)
     if not turns:
         return current_message
-    # Concatenate the previous user query for a richer signal
     prev_user = turns[-1].get("user") or ""
     if prev_user and prev_user.strip().lower() != current_message.strip().lower():
         return f"{prev_user} {current_message}".strip()

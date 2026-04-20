@@ -28,13 +28,16 @@ from typing import Optional
 from . import facts as F
 
 
-# ─── Reusable ask-for-next-step phrases ──────────────────────────────
+# ─── Reusable follow-up prompts — institutional register ──────────────
+# No retail CTAs. The chatbot does not solicit engagement. When a
+# follow-up is appended, it names a concrete next step the client can
+# take if they wish; otherwise the answer stands alone.
 _NEXT_STEP_ASKS = {
-    "ask_starter_or_topup": "Which path works better for you — top up, or Starter Access?",
-    "ask_firm_quote":       "Want a firm quote for your trade?",
-    "ask_walk_through":     "Want me to walk you through the first step?",
-    "ask_specific_concern": "Any specific concern I can go deeper on?",
-    "ask_schedule_call":    "Want me to schedule a call with our team?",
+    "ask_starter_or_topup": "Please indicate whether you would prefer Starter Access at the current allocation or to increase to the individual tier.",
+    "ask_firm_quote":       "A firm quote can be provided by our OTC desk on request.",
+    "ask_walk_through":     "A relationship manager can guide the onboarding steps.",
+    "ask_specific_concern": "",
+    "ask_schedule_call":    "A call with the relationship manager can be arranged on request.",
 }
 
 
@@ -62,45 +65,43 @@ def _compose_fiat_tier_check(amount_usd: float) -> Optional[str]:
         return (
             f"{fmt(amount_usd)} is below our Starter Access floor of "
             f"{fmt(starter_min)}. For smaller amounts a retail exchange is "
-            f"more economic. Want me to suggest one, or top up?"
+            f"more economic. The relationship manager can discuss options if you intend to scale."
         )
     if amount_usd < indiv_min:
         short = indiv_min - amount_usd
         return (
             f"{fmt(amount_usd)} qualifies for Starter Access "
             f"({fmt(starter_min)}–{fmt(indiv_min - 1)}). "
-            f"You're {fmt(short)} from the individual tier. "
-            f"Want the Starter Access application, or top up to individual?"
+            f"You are {fmt(short)} from the individual tier."
         )
     if amount_usd < inst_min:
         short = inst_min - amount_usd
         return (
             f"{fmt(amount_usd)} is in the individual tier "
-            f"(minimum {fmt(indiv_min)}). You're {fmt(short)} from full "
-            f"institutional ({fmt(inst_min)}). Happy where you are?"
+            f"(minimum {fmt(indiv_min)}). {fmt(short)} away from full "
+            f"institutional ({fmt(inst_min)})."
         )
     if amount_usd < 1_000_000:
         return (
             f"{fmt(amount_usd)} qualifies for institutional access — "
-            f"dedicated RM, tighter OTC spreads, priority onboarding. "
-            f"Want me to start your application?"
+            f"dedicated relationship manager, tighter OTC spreads, priority onboarding."
         )
     if amount_usd < 5_000_000:
         return (
-            f"{fmt(amount_usd)} puts you in our institutional tier. "
-            f"Enhanced staking rates, VIP OTC coverage. Want a call "
-            f"with Layla (OTC) or Khalid (CEO)?"
+            f"{fmt(amount_usd)} places you in the institutional tier — "
+            f"enhanced staking rates and VIP OTC coverage. A call with "
+            f"Layla Al-Fayez (Head of OTC) or Khalid Al Fardan (CEO) can be arranged on request."
         )
     if amount_usd < 25_000_000:
         return (
             f"{fmt(amount_usd)} qualifies for Institutional tier with "
-            f"custom terms — dedicated validator, bespoke OTC spreads. "
-            f"Shall I set up a bespoke proposal?"
+            f"custom terms — dedicated validator and bespoke OTC spreads. "
+            f"A tailored proposal can be prepared by the relationship manager."
         )
     return (
         f"{fmt(amount_usd)} is Sovereign-tier territory. +0.6% enhanced "
-        f"staking rates, direct desk access, bespoke everything. Want "
-        f"me to arrange an introduction to Khalid (CEO)?"
+        f"staking rates, direct desk access, and bespoke structuring. "
+        f"An introduction to Khalid Al Fardan (CEO) can be arranged on request."
     )
 
 
@@ -111,17 +112,16 @@ def _compose_btc_borrow(btc: float) -> str:
     if btc < pledge_min:
         diff = pledge_min - btc
         return (
-            f"{btc:g} BTC is below our {pledge_min:g} BTC minimum pledge. "
-            f"You're {diff:g} short. Want to add {diff:g} BTC, or look "
-            f"at Starter Access for smaller positions?"
+            f"{btc:g} BTC is below the {pledge_min:g} BTC minimum pledge. "
+            f"Shortfall: {diff:g} BTC. Starter Access may accommodate smaller positions."
         )
     cap = _format_btc_loan_capacity(btc, 75)
     cap_safe = _format_btc_loan_capacity(btc, 50)
     rate = F.LENDING_RATES[1]
     return (
-        f"With {btc:g} BTC as collateral at our max 75% LTV you can "
-        f"borrow up to {cap}. At a safer 50% LTV: {cap_safe}. Rates "
-        f"from {rate:.2f}% APR for 1-year. Want a firm quote?"
+        f"With {btc:g} BTC as collateral at the 75% LTV maximum, "
+        f"indicative borrow capacity is up to {cap}. At 50% LTV: {cap_safe}. "
+        f"Rates from {rate:.2f}% APR for 1-year. Firm quote available from the desk."
     )
 
 
@@ -130,16 +130,15 @@ def _compose_eth_borrow(eth: float) -> str:
     if eth < pledge_min:
         diff = pledge_min - eth
         return (
-            f"{eth:g} ETH is below our {pledge_min:g} ETH minimum pledge. "
-            f"You're {diff:g} short. Want to add {diff:g} ETH, or try "
-            f"Starter Access for smaller positions?"
+            f"{eth:g} ETH is below the {pledge_min:g} ETH minimum pledge. "
+            f"Shortfall: {diff:g} ETH. Starter Access may accommodate smaller positions."
         )
     cap = _format_eth_loan_capacity(eth, 75)
     cap_safe = _format_eth_loan_capacity(eth, 50)
     return (
-        f"With {eth:g} ETH as collateral at 75% LTV you can borrow "
-        f"up to {cap}. At a safer 50% LTV: {cap_safe}. No prepayment "
-        f"penalty on any term. Want a firm quote?"
+        f"With {eth:g} ETH as collateral at 75% LTV, indicative borrow "
+        f"capacity is up to {cap}. At 50% LTV: {cap_safe}. No prepayment "
+        f"penalty on any term. Firm quote available from the desk."
     )
 
 
@@ -151,10 +150,10 @@ def _compose_crypto_stake(asset: str, amount: float) -> Optional[str]:
         # BTC can't stake
         if asset == "BTC":
             return (
-                "Bitcoin doesn't support staking — it's proof-of-work. "
-                "You can use BTC as loan collateral (up to 75% LTV) and "
-                "deploy the borrowed fiat into a yield strategy. Want to "
-                "explore that path?"
+                "Bitcoin does not support staking — it is proof-of-work. "
+                "BTC can be used as loan collateral (up to 75% LTV) and the "
+                "borrowed fiat deployed into a yield strategy. "
+                "The relationship manager can structure this approach."
             )
         return None
     unbonding = F.STAKING_UNBONDING_DAYS.get(asset, 0)
@@ -164,10 +163,10 @@ def _compose_crypto_stake(asset: str, amount: float) -> Optional[str]:
     if usd_value < stake_min:
         short = stake_min - usd_value
         return (
-            f"{amount:g} {asset} (~{F.fmt_usd(usd_value)}) is below our "
-            f"{F.fmt_usd(stake_min)} staking minimum per network. You're "
-            f"about {F.fmt_usd(short)} short. Starter Access may open "
-            f"lower tiers — want me to check eligibility?"
+            f"{amount:g} {asset} (~{F.fmt_usd(usd_value)}) is below the "
+            f"{F.fmt_usd(stake_min)} per-network staking minimum. "
+            f"Shortfall: ~{F.fmt_usd(short)}. "
+            f"Starter Access may accommodate smaller positions."
         )
     # Above minimum — give a real projection
     yearly = amount * (apy / 100)
@@ -175,9 +174,9 @@ def _compose_crypto_stake(asset: str, amount: float) -> Optional[str]:
         f"no lock-up" if unbonding == 0 else f"{unbonding:g}-day unbonding"
     )
     return (
-        f"At {apy:.1f}% APY on {amount:g} {asset} you'd earn about "
-        f"{yearly:g} {asset}/year (~{F.fmt_usd(yearly * price)}), paid "
-        f"daily. {unbonding_note.capitalize()}. Ready to stake?"
+        f"At {apy:.1f}% APY on {amount:g} {asset}, indicative annual "
+        f"reward is {yearly:g} {asset} (~{F.fmt_usd(yearly * price)}), "
+        f"paid daily. {unbonding_note.capitalize()}. Rates vary with network conditions."
     )
 
 
@@ -187,11 +186,11 @@ def _compose_crisis(text: str) -> str:
     ins = F.INSURANCE
     covers = ", ".join(ins["covers"])
     return (
-        f"Your assets are segregated in {F.CUSTODY['provider']} vaults — "
-        f"legally separate from our balance sheet. We never lend them "
-        f"out. Plus {F.fmt_usd(ins['amount_usd'])} {ins['underwriter']} "
-        f"insurance covering {covers}. Market price swings are your own "
-        f"risk though. Any specific scenario worrying you?"
+        f"Client assets are segregated in {F.CUSTODY['provider']} vaults — "
+        f"legally separate from our balance sheet and not rehypothecated. "
+        f"An {F.fmt_usd(ins['amount_usd'])} {ins['underwriter']} policy "
+        f"covers {covers}, subject to policy terms and exclusions. "
+        f"Market price movements remain the client's own risk."
     )
 
 
@@ -285,34 +284,32 @@ def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
     # "I want to borrow" / "can i take a loan" — no amount, no asset
     if "borrow" in actions and not amounts and not assets:
         return (
-            "Happy to help with a loan. Two things: how much do you want "
-            "to borrow (USD, AED, or EUR), and how much BTC or ETH can "
-            "you pledge as collateral?",
+            "Please specify the loan size (USD, AED, or EUR) and the "
+            "collateral asset and amount (BTC or ETH). An indicative quote can then be provided.",
             [{"label": "Loan Calculator", "url": "/dashboard/loans", "kind": "link"}],
         )
 
     # "I want to stake" — no amount, no asset
     if "stake" in actions and not amounts and not assets:
         return (
-            "Good choice — which network would you like to stake? We "
-            "support ETH, SOL, POL, ADA, DOT, AVAX, and ATOM. And "
-            "roughly how much?",
+            "Please indicate the network (ETH, SOL, POL, ADA, DOT, AVAX, "
+            "or ATOM) and the approximate size. Rates and unbonding terms vary by network.",
             [{"label": "Open Staking", "url": "/dashboard/staking", "kind": "link"}],
         )
 
     # "I want to withdraw" — no asset/amount
     if "withdraw" in actions and not amounts and not assets:
         return (
-            "Sure — which asset are you withdrawing, and how much? "
-            "Typical processing: 1-4 hours for crypto, 24 hours for fiat wire.",
+            "Please specify the asset and amount. Indicative processing: "
+            "1-4 hours for crypto, 24 hours for fiat wire.",
             [{"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"}],
         )
 
     # "I want to deposit" — no asset
     if "deposit" in actions and not assets:
         return (
-            "Pick an asset and I'll get you a deposit address. BTC, ETH, "
-            "SOL, USDT, or USDC? (We support 40+ networks — which one?)",
+            "Please specify the asset (BTC, ETH, SOL, USDT, or USDC — "
+            "40+ networks supported). A deposit address will be generated accordingly.",
             [{"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"}],
         )
 
@@ -320,13 +317,11 @@ def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
     # Kept deliberately OUTSIDE the question-form guard because even
     # though "how much" is technically a question, the user needs
     # specific input (asset + amount) before we can compute anything.
-    # But we ONLY fire if no retrieval-worthy context is present —
-    # i.e. the user hasn't named a topic the retriever could match on.
     if ("borrow" in actions or "earn" in actions) and not amounts and not assets:
         if "how much" in text:
             return (
-                "Happy to run the numbers. Quick question: which asset "
-                "(BTC or ETH), and how much of it do you have?",
+                "Please specify the asset (BTC or ETH) and the amount "
+                "held. Indicative capacity can then be computed.",
                 [{"label": "Loan Calculator", "url": "/dashboard/loans", "kind": "link"}],
             )
 
@@ -398,9 +393,9 @@ def compose(entities: dict) -> Optional[tuple[str, list[dict]]]:
             )
         # Other crypto assets aren't loan-collateral today
         return (
-            f"{val:g} {curr} isn't currently accepted as loan collateral "
-            f"— we accept BTC and ETH only. Want to swap to BTC via our "
-            f"OTC desk and borrow against that?",
+            f"{val:g} {curr} is not currently accepted as loan collateral "
+            f"— only BTC and ETH. A swap to BTC via our OTC desk, followed "
+            f"by a loan against that, can be arranged on request.",
             [{"label": "Open OTC Desk", "url": "/dashboard/services/otc", "kind": "link"}],
         )
 
@@ -434,9 +429,9 @@ def compose(entities: dict) -> Optional[tuple[str, list[dict]]]:
         if curr == "BTC":
             borrow_cap = _format_btc_loan_capacity(val, 75)
             return (
-                f"With {val:g} BTC you can: custody (insured cold storage, "
-                f"fee 0.10-0.50%/yr), or borrow up to {borrow_cap} at 75% "
-                f"LTV. BTC doesn't stake. Which direction sounds useful?",
+                f"With {val:g} BTC, available activities are: insured "
+                f"custody (fee 0.10-0.50% p.a.), or borrowing up to "
+                f"{borrow_cap} at 75% LTV. BTC does not support staking.",
                 [
                     {"label": "Open Wallets", "url": "/dashboard/wallets", "kind": "link"},
                     {"label": "Open Loans", "url": "/dashboard/loans", "kind": "link"},
@@ -445,9 +440,8 @@ def compose(entities: dict) -> Optional[tuple[str, list[dict]]]:
         if curr == "ETH":
             apy = F.STAKING_APY.get("ETH", 5.2)
             return (
-                f"With {val:g} ETH you can: custody, stake (~{apy:.1f}% "
-                f"APY daily payouts), or borrow at 75% LTV. Which angle "
-                f"interests you?",
+                f"With {val:g} ETH, available activities are: custody, "
+                f"staking (~{apy:.1f}% APY, daily payouts), or borrowing at 75% LTV.",
                 [
                     {"label": "Open Staking", "url": "/dashboard/staking", "kind": "link"},
                     {"label": "Open Loans", "url": "/dashboard/loans", "kind": "link"},
@@ -456,9 +450,8 @@ def compose(entities: dict) -> Optional[tuple[str, list[dict]]]:
         if curr in F.STAKING_APY:
             apy = F.STAKING_APY[curr]
             return (
-                f"With {val:g} {curr} you can custody it or stake at "
-                f"~{apy:.1f}% APY. Other options depend on the asset. "
-                f"Which interests you?",
+                f"With {val:g} {curr}, available activities include "
+                f"custody or staking at ~{apy:.1f}% APY. Other options depend on the asset.",
                 [{"label": "Open Staking", "url": "/dashboard/staking", "kind": "link"}],
             )
 

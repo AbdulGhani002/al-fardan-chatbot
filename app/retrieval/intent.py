@@ -1492,8 +1492,9 @@ def scripted_reply(intent: Intent) -> str | None:
         )
     if intent == "signup":
         return (
-            "Happy to help you open an account — takes about 5 minutes. "
-            "Which service are you most interested in first?"
+            "Account onboarding takes approximately 5 minutes to initiate. "
+            "Please indicate which service is most relevant — Custody, "
+            "Staking, OTC, or Lending."
         )
     if intent == "balance_check":
         return (
@@ -1872,19 +1873,18 @@ def scripted_reply(intent: Intent) -> str | None:
             "cancelled — we've already hedged with market makers on your "
             "acceptance. Before confirming you get a firm quote valid for "
             "15 minutes where the price is locked; use that window to "
-            "double-check size and direction. Would you like me to walk "
-            "you through the confirmation flow so nothing slips?"
+            "double-check size and direction. The relationship manager "
+            "can walk through the confirmation flow on request."
         )
     if intent == "otc_max_size":
         return (
-            "Our standard maximum OTC trade size is USD 50 million per "
-            "ticket. For trades above $50M we can absolutely accommodate "
-            "— please contact your relationship manager or the OTC desk "
-            "24-48 hours in advance so we can pre-stage liquidity and "
-            "give you a firm (not indicative) quote. Our largest single "
-            "execution to date is over $50M, and we've done blocks up to "
-            "several hundred million with advance notice. What size are "
-            "you looking at?"
+            "Standard maximum OTC trade size is USD 50 million per "
+            "ticket. Trades above USD 50M can be accommodated with "
+            "24-48 hours' advance notice to the relationship manager or "
+            "OTC desk, so that liquidity can be pre-staged and a firm "
+            "(rather than indicative) quote issued. Largest single "
+            "execution to date is above USD 50M; blocks up to several "
+            "hundred million have been executed with advance notice."
         )
     if intent == "tin_required":
         return (

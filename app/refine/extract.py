@@ -32,6 +32,32 @@ _STOPWORDS = frozenset({
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9\-']{1,}")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
 
+# Abbreviations whose trailing period must NOT be treated as a sentence
+# boundary. Critical for institutional copy that routinely names
+# "Sheikh Dr. Tariq", "Mr. Al Fardan", "e.g.", "U.S.", "Ltd.", etc.
+# We temporarily swap the period for a sentinel, split, then restore.
+_ABBREV_TOKENS = (
+    "Dr.", "Mr.", "Mrs.", "Ms.", "Prof.", "Sr.", "Jr.", "St.",
+    "Ltd.", "Inc.", "Co.", "Corp.", "LLC.",
+    "vs.", "etc.", "e.g.", "i.e.", "approx.", "No.",
+    "U.S.", "U.A.E.", "U.K.",
+    "L.L.C.",
+)
+_PERIOD_SENTINEL = "\u0001"  # ASCII SOH — never appears in real copy
+
+
+def _protect_abbrevs(text: str) -> str:
+    """Swap the period of common abbreviations with a sentinel so the
+    sentence splitter doesn't mistake them for sentence boundaries."""
+    for token in _ABBREV_TOKENS:
+        if token in text:
+            text = text.replace(token, token.replace(".", _PERIOD_SENTINEL))
+    return text
+
+
+def _unprotect_abbrevs(text: str) -> str:
+    return text.replace(_PERIOD_SENTINEL, ".")
+
 
 def _tokenize(text: str) -> list[str]:
     return [t.lower() for t in _WORD_RE.findall(text)]
@@ -42,9 +68,15 @@ def _content_tokens(text: str) -> set[str]:
 
 
 def split_sentences(text: str) -> list[str]:
-    """Split on sentence terminators followed by capital / digit."""
-    parts = _SENTENCE_SPLIT_RE.split(text.strip())
-    return [p.strip() for p in parts if p.strip()]
+    """Split on sentence terminators followed by capital / digit.
+
+    Protects common abbreviations (Dr., Mr., e.g., U.S., Ltd.) so
+    ``Sheikh Dr. Tariq Al-Mahrouqi`` stays in one sentence instead of
+    being cut off at ``Sheikh Dr.``.
+    """
+    protected = _protect_abbrevs(text.strip())
+    parts = _SENTENCE_SPLIT_RE.split(protected)
+    return [_unprotect_abbrevs(p).strip() for p in parts if p.strip()]
 
 
 def _score_sentence(sentence: str, query_tokens: set[str]) -> float:
