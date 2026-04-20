@@ -216,6 +216,38 @@ _QUESTION_OPENER_RE = _re.compile(
     _re.I,
 )
 
+# A question opener anywhere in the sentence (after a greeting prefix).
+# Catches "Hi, what is staking" — the literal "Hi," prefix previously
+# hid the "what is" signal from the start-anchored _QUESTION_OPENER_RE
+# and the composer fired clarification on the word "staking".
+_QUESTION_SIGNAL_RE = _re.compile(
+    r"\b("
+    r"what\s+(is|are|does|do|was|were)|"
+    r"how\s+(do|does|is|are|can|could|long|much|many)|"
+    r"why\s+(is|are|do|does|would|should)|"
+    r"when\s+(is|are|was|were|did|do|does|can|will)|"
+    r"where\s+(is|are|can|do|does)|"
+    r"who\s+(is|are|do|does)|"
+    r"which\s+(is|are|one|ones|of)|"
+    r"can\s+(you|i|we)|do\s+(you|i|we)|does\s+(the|your|al|q9)|"
+    r"tell\s+me|explain\s+|please\s+(tell|explain|help)"
+    r")\b",
+    _re.I,
+)
+
+# Greeting/filler prefixes to strip before question-form detection.
+# Catches "Hi, hello hey what is staking" without requiring the
+# question opener to be the very first token.
+_GREETING_PREFIX_RE = _re.compile(
+    r"^\s*("
+    r"hi|hello|hey|yo|greetings|assalamu\s+alaikum|salaam|salam|"
+    r"good\s+(morning|afternoon|evening|day)|"
+    r"okay|ok|alright|so|umm|uhh|well|actually|sorry|excuse\s+me"
+    r")"
+    r"[\s,.\-:!]+",
+    _re.I,
+)
+
 # Intent-to-do markers. Even inside a longer message these indicate the
 # user WANTS to do the thing right now, not ask about it. If we see
 # these + an action word, the clarification branch is appropriate.
@@ -231,6 +263,19 @@ _INTENT_TO_DO_RE = _re.compile(
 )
 
 
+def _strip_greeting_prefix(text: str) -> str:
+    """Remove leading greetings/fillers so ``Hi, what is staking`` is
+    seen as ``what is staking`` by the question-form detector."""
+    stripped = text
+    # Strip up to two layers (e.g. "hi, hello, what is X")
+    for _ in range(2):
+        m = _GREETING_PREFIX_RE.match(stripped)
+        if not m:
+            break
+        stripped = stripped[m.end():]
+    return stripped.strip() or text
+
+
 def _is_question_form(text: str) -> bool:
     """True if the message reads as a question rather than an
     intent-to-do statement. Questions should flow to retrieval.
@@ -239,7 +284,10 @@ def _is_question_form(text: str) -> bool:
       - Explicit intent-to-do markers ("I want to...", "let me...")
         trump everything — even if the message ends in "?" we treat
         it as action ("I want to stake, is that possible?").
-      - Otherwise: ends in "?", or opens with a question word.
+      - Otherwise: ends in "?", or opens with a question word
+        (after stripping greeting prefixes), or contains an obvious
+        question signal anywhere ("what is staking" inside a longer
+        greeting + question compound).
     """
     if not text:
         return False
@@ -247,7 +295,10 @@ def _is_question_form(text: str) -> bool:
         return False
     if text.rstrip().endswith("?"):
         return True
-    if _QUESTION_OPENER_RE.match(text):
+    cleaned = _strip_greeting_prefix(text)
+    if _QUESTION_OPENER_RE.match(cleaned):
+        return True
+    if _QUESTION_SIGNAL_RE.search(text):
         return True
     return False
 
@@ -274,9 +325,16 @@ def _compose_clarification(entities: dict) -> Optional[tuple[str, list[dict]]]:
     if _is_question_form(text):
         return None
 
-    # Also skip very short fragments (≤ 3 words) — the previous
-    # heuristic; still useful for catching casual "stake?" / "lend?"
-    # without over-qualifying.
+    # REQUIRE an explicit intent-to-do marker ("I want to stake", "help
+    # me borrow", "let me deposit"). Just having an action word in the
+    # sentence (e.g. the word "staking" inside "Hi, what is staking")
+    # is NOT enough — that word-presence heuristic was the root cause
+    # of repeated mis-routings where pure questions got the "please
+    # indicate the network" clarification reply instead of a KB answer.
+    if not _INTENT_TO_DO_RE.search(text):
+        return None
+
+    # Short fragments (≤ 3 words) — still skip. Retriever handles these.
     is_short_fragment = len(text.split()) <= 3
     if is_short_fragment:
         return None
