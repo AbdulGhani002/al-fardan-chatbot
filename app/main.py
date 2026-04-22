@@ -266,6 +266,14 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-Chatbot-Secret"],
 )
 
+# Twilio voice webhook routes — /voice/incoming, /voice/respond,
+# /voice/status. Mounted here so the routes + OpenAPI docs are
+# always visible; they're no-ops until Twilio is wired to the
+# same base URL.
+from .voice.twilio_routes import router as voice_router  # noqa: E402
+
+app.include_router(voice_router)
+
 # The retriever can be either a DenseRetriever (preferred, semantic) or
 # a TfidfRetriever (fallback). Both expose the same public surface
 # (size, vocab_size, search, entries) so call sites are retriever-agnostic.
@@ -995,6 +1003,72 @@ async def chat_history(session_token: str, limit: int = 50):
     token is effectively the capability — only the holder of the token
     can read that conversation)."""
     return {"data": get_history(settings.db_path, session_token, limit)}
+
+
+# ─── Shared helper — used by /chat AND /voice/respond ─────────────────
+
+async def _handle_chat_text(
+    session_token: str,
+    message: str,
+    source: str = "chat",
+    user_id: str | None = None,
+    user_email: str | None = None,
+) -> str:
+    """Lightweight wrapper for non-HTTP callers (e.g. the voice
+    webhook). Returns just the reply text — no TwiML, no action
+    buttons, no intent metadata. The voice layer strips formatting
+    before calling TTS, so we deliberately keep the output plain.
+
+    We build a synthetic ChatRequest, invoke the same `chat` handler
+    the widget uses, and unwrap the text. This guarantees the phone
+    agent's answers are identical to the widget's for the same
+    question — same KB, same RAG, same Safiya persona.
+    """
+    from fastapi import Request as _Req  # local import to avoid loop
+
+    req = ChatRequest(
+        session_token=session_token,
+        message=message,
+        user_id=user_id,
+        user_email=user_email,
+    )
+
+    # Build a minimal scope so the `chat()` endpoint's Request param
+    # is present but we never read it for anything voice-relevant
+    # (rate-limiting keys on IP which we don't have for a phone call).
+    scope = {
+        "type": "http",
+        "headers": [(b"x-forwarded-for", b"voice-agent")],
+        "method": "POST",
+        "path": "/chat",
+        "query_string": b"",
+    }
+    fake_request = _Req(scope)
+
+    response: ChatResponse = await chat(  # type: ignore[misc]
+        req,
+        fake_request,
+        r=_retriever,
+    )
+    # For voice, strip any leading sales-y bridge words the widget
+    # prepends (e.g. mood acknowledgements like "I hear you —").
+    text = response.reply or ""
+    # Replace Markdown-ish list bullets with pauses; TTS reads "*" as
+    # "asterisk" which sounds awful.
+    text = (
+        text.replace("\n\n", ". ")
+        .replace("\n", ". ")
+        .replace(" • ", ". ")
+        .replace(" * ", ". ")
+        .replace(" — ", ", ")
+    )
+    # Log source for debugging (voice vs widget use the same brain
+    # but we want to separate metrics later).
+    print(
+        f"[handle_chat_text] source={source} session={session_token[:8]} "
+        f"len={len(text)} match={response.match_type}"
+    )
+    return text
 
 
 # ─── Admin / integration ──────────────────────────────────────────────

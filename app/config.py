@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     # exact-match queries while letting the LLM handle the long tail.
     rag_high_confidence_threshold: float = 0.55
 
+    # ─── Voice (Twilio phone agent) ──────────────────────────────
+    # Auth token from the Twilio console — used to HMAC-verify
+    # every incoming webhook so only Twilio can hit /voice/*.
+    # Leave empty for local dev; in production ALWAYS set this.
+    twilio_auth_token: str = ""
+
     @property
     def kb_dir(self) -> Path:
         return self.data_dir / "kb"
