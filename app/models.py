@@ -120,6 +120,15 @@ MatchType = Literal[
     "intent_tax_withholding",
     "intent_account_recovery",
     "system_error",
+    # RAG (retrieval-augmented generation) match types — the top KB
+    # entry still grounds the answer but an LLM rewrote it into
+    # natural prose. Suffix identifies the generator backend for
+    # observability / cost accounting.
+    "rag_genspark",
+    "rag_openai",
+    "rag_openai_compatible",
+    "rag_groq",
+    "rag_ollama",
 ]
 
 

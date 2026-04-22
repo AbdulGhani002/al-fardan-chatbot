@@ -48,6 +48,17 @@ from .compose.composer import compose as compose_reply
 from .refine.typos import correct_typos, preview_corrections
 from .refine.extract import extract_best_sentences
 from .refine.emotion import detect as detect_mood, acknowledgment, escalation_actions
+from .rag.generator import (
+    Generator,
+    build_generator,
+    probe_generator,
+)
+from .rag.prompt import (
+    DEFAULT_GEN_OPTIONS,  # noqa: F401 — kept for downstream tuning
+    MAX_REFERENCES,
+    SYSTEM_PROMPT,
+    build_user_prompt,
+)
 from .refine.synonyms import expand as expand_synonyms
 from .integrations import platform_settings as _platform_settings
 
@@ -262,6 +273,13 @@ _retriever: Optional[object] = None
 _retriever_kind: str = "none"  # "dense" | "tfidf" | "none" — for /health
 _start_time = time.time()
 
+# RAG (retrieval-augmented generation) layer.
+# Populated on startup when a generator backend is configured
+# (Ollama, Genspark, OpenAI, Groq, …). Kept optional so the bot
+# still works in pure-retrieval mode when no LLM is available.
+_generator: Optional[Generator] = None
+_generator_ready: bool = False
+
 
 def _load_retriever() -> object:
     """Preference order for producing a ready-to-serve retriever:
@@ -339,7 +357,7 @@ def _load_retriever() -> object:
 
 @app.on_event("startup")
 async def _on_startup() -> None:
-    global _retriever
+    global _retriever, _generator, _generator_ready
     ensure_db(settings.db_path)
     _retriever = _load_retriever()
     print(
@@ -348,6 +366,18 @@ async def _on_startup() -> None:
         f"{_retriever.vocab_size} "  # type: ignore[attr-defined]
         f"{'dims' if _retriever_kind == 'dense' else 'tokens'}"
     )
+
+    # Optional RAG generator. Stays None if not configured → bot
+    # serves KB answers verbatim (prior behaviour).
+    _generator = build_generator()
+    if _generator is not None:
+        _generator_ready = await probe_generator(_generator)
+        print(
+            f"[main] generator backend={_generator.backend} "
+            f"model={_generator.model} ready={_generator_ready}"
+        )
+    else:
+        print("[main] no generator configured — retrieval-only mode")
 
 
 def require_admin_secret(
@@ -867,6 +897,52 @@ async def chat(
     entry_actions = _actions_for_entry(top.entry)
     humanized = _humanize_answer(top.entry, top.entry.answer, req.message)
 
+    # ─── RAG (generative) layer ───────────────────────────────────
+    # When a generator is configured AND healthy, rewrite the canned
+    # KB answer into a natural-language reply grounded on the top-N
+    # references. Retains the KB answer as a safety net — if the
+    # LLM call fails, times out, or produces an empty string we fall
+    # straight back to `humanized` and the user sees no difference.
+    match_type_used = "kb_hit"
+    if _generator_ready and _generator is not None:
+        refs = [
+            {
+                "id": h.entry.id,
+                "category": h.entry.category,
+                "question": h.entry.question,
+                "answer": h.entry.answer,
+            }
+            for h in hits[:MAX_REFERENCES]
+        ]
+        try:
+            history = get_history(
+                settings.db_path, req.session_token, limit=8
+            )
+        except Exception:  # noqa: BLE001
+            history = []
+        user_prompt = build_user_prompt(
+            question=req.message,
+            references=refs,
+            session_history=history,
+        )
+        try:
+            gen_result = await _generator.generate(
+                system=SYSTEM_PROMPT,
+                user=user_prompt,
+            )
+            if gen_result.text and len(gen_result.text) >= 20:
+                humanized = gen_result.text
+                match_type_used = f"rag_{gen_result.backend}"
+                print(
+                    f"[rag] {gen_result.backend} ok — "
+                    f"{gen_result.latency_ms}ms, "
+                    f"{len(gen_result.text)} chars, "
+                    f"top_ref={top.entry.id} score={top.score:.3f}"
+                )
+        except Exception as err:  # noqa: BLE001
+            # Never crash /chat on LLM failure — fall back silently.
+            print(f"[rag] generation failed: {err!r} — using KB answer")
+
     # ─── Apply mood-aware adjustments ─────────────────────────────
     # Prepend a short acknowledgement if the user sounded frustrated,
     # urgent, confused, or excited. Surface human-handoff buttons as
@@ -883,7 +959,7 @@ async def chat(
 
     response = ChatResponse(
         reply=humanized,
-        match_type="kb_hit",
+        match_type=match_type_used,
         matched_entry_id=top.entry.id,
         match_score=top.score,
         session_token=req.session_token,
@@ -901,13 +977,13 @@ async def chat(
         session_token=req.session_token,
         role="bot",
         text=humanized,
-        match_type="kb_hit",
+        match_type=match_type_used,
         matched_entry=top.entry.id,
         match_score=top.score,
     )
     _session_record_turn(
         req.session_token, req.message, humanized,
-        "kb_hit", top.entry.id, top.score,
+        match_type_used, top.entry.id, top.score,
     )
     return response
 

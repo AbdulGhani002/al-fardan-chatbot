@@ -62,6 +62,44 @@ class Settings(BaseSettings):
         "http://localhost:3000"
     )
 
+    # ─── RAG / Generative layer ──────────────────────────────────
+    # Backend selection:
+    #   ""                  → plain retrieval only (safe default)
+    #   "genspark"          → Genspark.ai (primary — OpenAI-compatible)
+    #   "openai_compatible" → any generic OpenAI-style endpoint
+    #   "openai"            → OpenAI
+    #   "groq"              → Groq free tier
+    #   "ollama"            → local open-source model on the VPS
+    # When unset or empty the bot serves KB answers verbatim (prior
+    # behaviour). When set, /chat runs KB retrieval → LLM rewrite
+    # with graceful fallback to the KB answer if the LLM fails.
+    generator_backend: str = "genspark"
+
+    # Ollama — optional self-hosted open-source stack. Only active
+    # when GENERATOR_BACKEND=ollama.
+    ollama_host: str = "http://ollama:11434"
+    ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
+
+    # OpenAI-compatible backend (Genspark, OpenAI, Groq, Together, …).
+    # Never hardcode a key — populate from env (.env.local / VPS .env /
+    # Vercel). Defaults target Genspark's OpenAI-compatible API.
+    openai_api_base: str = "https://api.genspark.ai/v1"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+
+    # Per-request LLM timeout (seconds). CPU-hosted 7B models finish
+    # 320 tokens in 20-35 s; give enough buffer that a slow request
+    # doesn't trigger a retry storm, but not so much that a dead
+    # backend blocks /chat.
+    rag_timeout_s: float = 40.0
+
+    # RAG activation policy — when the top retrieval score is ABOVE
+    # `rag_high_confidence_threshold` we return the KB answer as-is
+    # (fast path, no LLM hit). Below it (but still >= confidence_
+    # threshold) we run RAG. This keeps costs + latency low for
+    # exact-match queries while letting the LLM handle the long tail.
+    rag_high_confidence_threshold: float = 0.55
+
     @property
     def kb_dir(self) -> Path:
         return self.data_dir / "kb"
