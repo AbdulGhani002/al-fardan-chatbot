@@ -103,7 +103,12 @@ class OllamaGenerator(Generator):
                 {"role": "user", "content": user},
             ],
             "options": {
-                "temperature": 0.3,
+                # 0.45 gives the model room to sound human and vary
+                # phrasing across similar queries. Lower was too robotic
+                # ("Staking involves committing..."); higher drifted off
+                # the reference facts. Sharia-sensitive answers are still
+                # constrained by the grounding rules in the system prompt.
+                "temperature": 0.45,
                 "top_p": 0.9,
                 # 512 tokens ~ 380 words — lets a 5-sentence answer
                 # finish cleanly without risk of mid-sentence cutoff.
