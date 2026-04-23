@@ -38,10 +38,12 @@ services:
     restart: unless-stopped
     volumes:
       - ollama-models:/root/.ollama
-    # Hard RAM cap — VPS is shared with mailcow + legalforge. Keep
-    # us well clear of the OOM killer. Bump if a bigger model is used.
-    mem_limit: 2500m
-    mem_reservation: 1500m
+    # Hard RAM cap — VPS is shared with mailcow + legalforge. Sized
+    # for llama3.2:3b-instruct-q4_K_M (~2.2GB model + runtime overhead).
+    # A 2GB /swapfile is provisioned on the host as fallback against
+    # transient spikes. Bump if a bigger model is used.
+    mem_limit: 3500m
+    mem_reservation: 2200m
     logging:
       driver: "json-file"
       options:
