@@ -127,7 +127,11 @@ MAX_REFERENCES = 4
 DEFAULT_GEN_OPTIONS: dict = {
     "temperature": 0.3,
     "top_p": 0.9,
-    "num_predict": 320,
+    # Raised from 320 — answers were getting truncated mid-sentence when
+    # the model spent its budget on the reference reasoning before it
+    # started emitting prose. 512 tokens gives a comfortable margin; the
+    # 120-word cap in the system prompt still keeps output concise.
+    "num_predict": 512,
     "repeat_penalty": 1.05,
     "stop": ["Client's question:", "<REFERENCES>", "</REFERENCES>"],
 }

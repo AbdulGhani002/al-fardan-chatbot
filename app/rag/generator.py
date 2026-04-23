@@ -105,7 +105,10 @@ class OllamaGenerator(Generator):
             "options": {
                 "temperature": 0.3,
                 "top_p": 0.9,
-                "num_predict": 320,
+                # 512 tokens ~ 380 words — lets a 5-sentence answer
+                # finish cleanly without risk of mid-sentence cutoff.
+                # The system prompt still caps output at 120 words.
+                "num_predict": 512,
                 "repeat_penalty": 1.05,
             },
         }
@@ -176,7 +179,7 @@ class OpenAICompatibleGenerator(Generator):
             "model": self.model,
             "temperature": 0.3,
             "top_p": 0.9,
-            "max_tokens": 320,
+            "max_tokens": 512,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
