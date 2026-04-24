@@ -103,12 +103,12 @@ class OllamaGenerator(Generator):
                 {"role": "user", "content": user},
             ],
             "options": {
-                # 0.45 gives the model room to sound human and vary
-                # phrasing across similar queries. Lower was too robotic
-                # ("Staking involves committing..."); higher drifted off
-                # the reference facts. Sharia-sensitive answers are still
-                # constrained by the grounding rules in the system prompt.
-                "temperature": 0.45,
+                # Lowered 0.45 → 0.3 after observing language drift
+                # (English Q answered in French) on llama3.2:3b. More
+                # deterministic sampling trades some phrasing variety
+                # for stricter language + grounding fidelity — the
+                # right trade-off for an institutional compliance bot.
+                "temperature": 0.3,
                 "top_p": 0.9,
                 # 512 tokens ~ 380 words — lets a 5-sentence answer
                 # finish cleanly without risk of mid-sentence cutoff.

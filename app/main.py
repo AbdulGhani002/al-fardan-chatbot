@@ -207,6 +207,54 @@ def _ends_with_question(text: str) -> bool:
     return stripped.endswith("?")
 
 
+# ─── Language fidelity ────────────────────────────────────────────────
+# Cheap heuristic script detector: catches the most common
+# language-drift failures (English question → French/Spanish/Arabic
+# reply) without pulling in langdetect + its 50MB of models. Good
+# enough for a pre-LLM sanity check; if it misclassifies edge cases we
+# err on the side of serving the LLM output (not the KB fallback).
+
+_FR_MARKERS = (
+    "c'est", "le client", "les références", "veuillez", "nous sommes",
+    "je vous invite", "il est", "vous pouvez", "n'est pas", "notre équipe",
+    "en savoir plus", "pour plus", "il s'agit", "cependant", "toutefois",
+)
+_ES_MARKERS = (
+    "el cliente", "para más", "se recomienda", "no se", "por favor",
+    "nuestro equipo", "en cuanto", "usted puede", "si usted", "podemos",
+)
+
+
+def _quick_lang(text: str) -> str:
+    """Return 'arabic' | 'french' | 'spanish' | 'english' based on a
+    cheap character + marker-phrase sniff. Defaults to 'english' when
+    unsure — English is the dominant query language and that keeps the
+    mismatch detector conservative."""
+    if not text:
+        return "english"
+    # Script-based: Arabic block is unambiguous.
+    arabic_chars = sum(
+        1 for c in text if 0x0600 <= ord(c) <= 0x06FF
+    )
+    if arabic_chars >= 3:
+        return "arabic"
+    low = text.lower()
+    if any(m in low for m in _FR_MARKERS):
+        return "french"
+    if any(m in low for m in _ES_MARKERS):
+        return "spanish"
+    return "english"
+
+
+def _is_language_mismatch(user_msg: str, llm_reply: str) -> bool:
+    """Return True when the LLM reply looks like a different language
+    than the user's message. Only signals on confident mismatches so
+    we don't reject correct responses."""
+    u = _quick_lang(user_msg)
+    r = _quick_lang(llm_reply)
+    return u == "english" and r in {"french", "spanish", "arabic"}
+
+
 def _followup_for(category: str) -> str | None:
     cat = (category or "").lower()
     cat = _CATEGORY_ALIASES.get(cat, cat)
@@ -939,14 +987,27 @@ async def chat(
                 user=user_prompt,
             )
             if gen_result.text and len(gen_result.text) >= 20:
-                humanized = gen_result.text
-                match_type_used = f"rag_{gen_result.backend}"
-                print(
-                    f"[rag] {gen_result.backend} ok — "
-                    f"{gen_result.latency_ms}ms, "
-                    f"{len(gen_result.text)} chars, "
-                    f"top_ref={top.entry.id} score={top.score:.3f}"
-                )
+                # Language-fidelity sanity check — catches llama3.2:3b
+                # drifting into French / Spanish on English queries. If
+                # the user's message looks English but the reply has
+                # telltale non-English phrases, fall back to the KB
+                # answer instead of shipping a wrong-language response.
+                if _is_language_mismatch(req.message, gen_result.text):
+                    print(
+                        f"[rag] language drift detected — "
+                        f"user={_quick_lang(req.message)}, "
+                        f"reply looks non-{_quick_lang(req.message)}; "
+                        f"falling back to KB answer for {top.entry.id}"
+                    )
+                else:
+                    humanized = gen_result.text
+                    match_type_used = f"rag_{gen_result.backend}"
+                    print(
+                        f"[rag] {gen_result.backend} ok — "
+                        f"{gen_result.latency_ms}ms, "
+                        f"{len(gen_result.text)} chars, "
+                        f"top_ref={top.entry.id} score={top.score:.3f}"
+                    )
         except Exception as err:  # noqa: BLE001
             # Never crash /chat on LLM failure — fall back silently.
             print(f"[rag] generation failed: {err!r} — using KB answer")

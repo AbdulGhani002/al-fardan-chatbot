@@ -98,7 +98,12 @@ class Settings(BaseSettings):
     # (fast path, no LLM hit). Below it (but still >= confidence_
     # threshold) we run RAG. This keeps costs + latency low for
     # exact-match queries while letting the LLM handle the long tail.
-    rag_high_confidence_threshold: float = 0.55
+    # Raised 0.55 → 0.80 after observing the 3B model occasionally
+    # rewriting high-score hits in the wrong language or claiming
+    # the reference "doesn't cover" the question. For very-high-
+    # confidence matches (80%+) we want the exact KB answer, not a
+    # lossy paraphrase.
+    rag_high_confidence_threshold: float = 0.80
 
     # ─── Voice (Twilio phone agent) ──────────────────────────────
     # Auth token from the Twilio console — used to HMAC-verify
