@@ -294,13 +294,18 @@ _BROAD_INTRO_BOOST = 0.25
 
 def _is_broad_intro(query: str) -> bool:
     q = (query or "").strip().lower()
-    # Drop a leading greeting so "Hi, can you tell me about staking?"
-    # is recognised the same as "Can you tell me about staking?".
-    for greeting in ("hi ", "hello ", "hey ", "salam ", "assalamu alaikum "):
-        if q.startswith(greeting):
-            q = q[len(greeting):]
-            break
-    # Also strip the leading "hi," / "hello," variants
+    # Drop a leading greeting (followed by any whitespace OR
+    # punctuation -- "Hi can you...", "Hi, can you...", "Hello.
+    # tell me..."). Previously only handled trailing-space form
+    # and missed the comma variant, which is exactly how James's
+    # smoke test was phrased.
+    import re as _re
+    q = _re.sub(
+        r"^(hi|hello|hey|salam|salaam|assalamu\s*alaikum)[\s,.;:!?-]+",
+        "",
+        q,
+    )
+    # Also peel off any stray punctuation that's left over.
     q = q.lstrip(",.!? ")
     return any(q.startswith(opener) for opener in _BROAD_INTRO_OPENERS)
 
