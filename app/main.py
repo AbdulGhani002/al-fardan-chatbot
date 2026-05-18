@@ -310,29 +310,86 @@ def _is_broad_intro(query: str) -> bool:
     return any(q.startswith(opener) for opener in _BROAD_INTRO_OPENERS)
 
 
-def _boost_overview_for_broad_query(query, hits):
+def _boost_overview_for_broad_query(query, hits, retriever=None):
     """Re-rank hits so curated service-overview entries (svc-*) win
     against narrow comparative entries on broad introductory queries.
 
-    Returns hits sorted by adjusted score, descending. Original
-    score is preserved on the SearchResult; only the sort order
-    changes. The retriever's confidence-threshold check
-    downstream still uses the raw `hits[0].score`, so the boost
-    only affects *which* curated entry surfaces -- it doesn't
-    fabricate a high-confidence answer when there isn't one.
+    Two passes:
+      1. If a curated svc-* entry is already in the top-k hits,
+         boost it via the score uplift so it lands at position 0.
+      2. If the relevant svc-* entry is NOT in the top-k (the
+         dense retriever's top_k is small -- 3 -- so a long-tail
+         comparative entry can edge it out), explicitly look it
+         up by category keyword in the query and PREPEND it to
+         the hits list. The KB only has 4 curated service-
+         overview rows so the keyword->id map is tiny + stable.
+
+    This is the safe path because the keyword check ensures we
+    only promote when the user actually referred to a service.
+    "Hi, tell me more about Sharia governance" doesn't match
+    any service keyword, so the curated injection doesn't fire
+    and the existing hits stand.
     """
     if not _is_broad_intro(query):
         return hits
-    if not hits:
+
+    q_lower = (query or "").lower()
+    # Map service keywords in the query -> svc-* entry id we want
+    # surfaced. Order matters: more specific matches first.
+    keyword_to_id = (
+        ("lending", "svc-008"),
+        ("loans", "svc-008"),
+        ("loan", "svc-008"),
+        ("borrow", "svc-008"),
+        ("credit line", "svc-008"),
+        ("staking", "svc-003"),
+        ("stake", "svc-003"),
+        ("otc desk", "svc-006"),
+        ("otc", "svc-006"),
+        ("custody", "svc-001"),
+        ("custodian", "svc-001"),
+    )
+    target_id = None
+    for kw, sid in keyword_to_id:
+        if kw in q_lower:
+            target_id = sid
+            break
+
+    if not target_id:
+        # No service keyword — fall back to score-uplift only
+        if not hits:
+            return hits
+
+        def adjusted(h):
+            eid = getattr(h.entry, "id", "") or ""
+            return h.score + _BROAD_INTRO_BOOST if eid.startswith("svc-") else h.score
+
+        return sorted(hits, key=adjusted, reverse=True)
+
+    # Service identified. If the target is already in hits, just
+    # move it to the front (preserving its real score).
+    for i, h in enumerate(hits):
+        if getattr(h.entry, "id", "") == target_id:
+            if i == 0:
+                return hits
+            return [h] + hits[:i] + hits[i + 1:]
+
+    # Not in hits. Look up the entry on the retriever and prepend
+    # a synthetic SearchResult so downstream logic treats it as
+    # the top hit. Score is set to whatever the actual top hit
+    # has (so it clears the confidence threshold cleanly).
+    if retriever is None or not hits:
         return hits
-
-    def adjusted_score(h) -> float:
-        eid = getattr(h.entry, "id", "") or ""
-        if eid.startswith("svc-"):
-            return h.score + _BROAD_INTRO_BOOST
-        return h.score
-
-    return sorted(hits, key=adjusted_score, reverse=True)
+    try:
+        entries = getattr(retriever, "entries", None) or []
+    except Exception:  # noqa: BLE001
+        return hits
+    for entry in entries:
+        if getattr(entry, "id", "") == target_id:
+            top_score = hits[0].score
+            new_hit = type(hits[0])(entry=entry, score=top_score)
+            return [new_hit] + list(hits)
+    return hits
 
 
 def _humanize_answer(entry, answer: str, query: str = "") -> str:
@@ -983,7 +1040,7 @@ async def chat(
     # is broadly introductory. We detect those queries with a
     # phrase whitelist and boost svc-* hits by a fixed score
     # delta so they top a longer-but-narrower comparative entry.
-    hits = _boost_overview_for_broad_query(req.message, hits)
+    hits = _boost_overview_for_broad_query(req.message, hits, retriever=r)
     threshold = _confidence_threshold()
 
     if not hits or hits[0].score < threshold:
