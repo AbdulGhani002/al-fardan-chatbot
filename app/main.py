@@ -261,6 +261,75 @@ def _followup_for(category: str) -> str | None:
     return _FOLLOWUP_BY_CATEGORY.get(cat)
 
 
+# Broad introductory openers. When the user starts a conversation
+# with one of these, they want a product overview -- not a narrow
+# comparative answer that happens to share the topic keyword. The
+# re-ranker boosts curated service-overview entries (id prefix
+# "svc-") so they outrank long-tail "Should I compare X across
+# providers?" entries that the dense retriever otherwise loves.
+_BROAD_INTRO_OPENERS = (
+    "tell me about",
+    "tell me more about",
+    "can you tell me about",
+    "what is",
+    "what's",
+    "whats",
+    "explain",
+    "introduce",
+    "describe",
+    "walk me through",
+    "i want to learn about",
+    "i would like to know about",
+    "give me an overview",
+    "show me",
+)
+
+# Score uplift applied to svc-* hits when the query is a broad
+# intro. Tuned to comfortably overcome the gap a dense retriever
+# leaves between a short narrow entry and a long overview entry
+# (~0.05-0.10 in practice). 0.25 is conservative enough to never
+# promote an irrelevant entry above a strongly-matching one.
+_BROAD_INTRO_BOOST = 0.25
+
+
+def _is_broad_intro(query: str) -> bool:
+    q = (query or "").strip().lower()
+    # Drop a leading greeting so "Hi, can you tell me about staking?"
+    # is recognised the same as "Can you tell me about staking?".
+    for greeting in ("hi ", "hello ", "hey ", "salam ", "assalamu alaikum "):
+        if q.startswith(greeting):
+            q = q[len(greeting):]
+            break
+    # Also strip the leading "hi," / "hello," variants
+    q = q.lstrip(",.!? ")
+    return any(q.startswith(opener) for opener in _BROAD_INTRO_OPENERS)
+
+
+def _boost_overview_for_broad_query(query, hits):
+    """Re-rank hits so curated service-overview entries (svc-*) win
+    against narrow comparative entries on broad introductory queries.
+
+    Returns hits sorted by adjusted score, descending. Original
+    score is preserved on the SearchResult; only the sort order
+    changes. The retriever's confidence-threshold check
+    downstream still uses the raw `hits[0].score`, so the boost
+    only affects *which* curated entry surfaces -- it doesn't
+    fabricate a high-confidence answer when there isn't one.
+    """
+    if not _is_broad_intro(query):
+        return hits
+    if not hits:
+        return hits
+
+    def adjusted_score(h) -> float:
+        eid = getattr(h.entry, "id", "") or ""
+        if eid.startswith("svc-"):
+            return h.score + _BROAD_INTRO_BOOST
+        return h.score
+
+    return sorted(hits, key=adjusted_score, reverse=True)
+
+
 def _humanize_answer(entry, answer: str, query: str = "") -> str:
     """Trim long content + append a follow-up question when missing.
 
@@ -899,6 +968,17 @@ async def chat(
     search_query = _build_contextual_query(req.session_token, req.message)
     expanded_query = expand_synonyms(search_query)
     hits = r.search(expanded_query, top_k=settings.top_k)
+    # ─── Broad-intro re-rank ─────────────────────────────────────
+    # James (May 17): "Hi can you tell me about staking?" hit
+    # qa-0330 ("Should I compare staking yields...") because the
+    # dense retriever sees "staking" as the dominant token and
+    # any short staking-tagged entry ranks high. The curated
+    # service-overview entries (svc-001/003/006/008) carry the
+    # actual product description and should win when the query
+    # is broadly introductory. We detect those queries with a
+    # phrase whitelist and boost svc-* hits by a fixed score
+    # delta so they top a longer-but-narrower comparative entry.
+    hits = _boost_overview_for_broad_query(req.message, hits)
     threshold = _confidence_threshold()
 
     if not hits or hits[0].score < threshold:
