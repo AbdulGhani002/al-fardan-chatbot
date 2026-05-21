@@ -12,3 +12,9 @@ app/data/chat.db
 .pytest_cache/
 dist/
 build/
+
+# Staged FAQ source files — keep the ingest script + .gitkeep but
+# not the large source corpus (lives in Downloads, re-stage when
+# needed via `cp ~/Downloads/chatbot.zip extract...`).
+scripts/incoming_faqs/*
+!scripts/incoming_faqs/.gitkeep

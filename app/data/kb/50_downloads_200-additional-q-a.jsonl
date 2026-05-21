@@ -1,0 +1,177 @@
+{"id": "200-additional-q-a-0001", "category": "general", "question": "What happens if your office is hit by a natural disaster?", "answer": "We have geo-redundant systems. Another office takes over instantly. Never lost service.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0006", "category": "general", "question": "What if the UAE government bans crypto?", "answer": "We would comply. But unlikely given VARA regulation. They support innovation.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0008", "category": "general", "question": "What if there's a network-wide attack (51%)?", "answer": "We would pause operations. Protect assets. Wait for resolution. Safety first.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0009", "category": "account", "question": "What if my account is hacked?", "answer": "2FA, whitelist, withdrawal limits. Multiple layers. But if happens, contact us immediately.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0010", "category": "account", "question": "What if I lose my phone with 2FA?", "answer": "Backup codes saved during setup. Use those. Or contact support for recovery.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0012", "category": "general", "question": "What if there's a bank run?", "answer": "We don't take deposits. Your assets are segregated. No bank run risk.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0013", "category": "general", "question": "What if the market crashes 90%?", "answer": "Margin calls trigger. Add collateral or get liquidated. We don't take positions.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0015", "category": "general", "question": "What if there's a dispute with my counterparty?", "answer": "We mediate. DIFC courts as final. Legal protection.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0016", "category": "general", "question": "What if my relationship manager leaves?", "answer": "Another assigned immediately. No service interruption. Continuity.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0017", "category": "general", "question": "What if Al Fardan Q9 goes bankrupt?", "answer": "Your assets are segregated. Legally yours. Not in bankruptcy estate.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0023", "category": "custody", "question": "What if my hardware wallet breaks?", "answer": "You don't use hardware wallet with us. Custody solves this.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0024", "category": "withdrawal", "question": "What if I accidentally send to wrong address?", "answer": "Crypto is final. We can't reverse. Always double-check.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0025", "category": "general", "question": "What if there's a bug in our smart contract?", "answer": "No smart contracts. Custody only. No contract risk.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0026", "category": "custody", "question": "What if Fireblocks has a breach?", "answer": "Keys are distributed. HSM protected. Never been breached.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0027", "category": "general", "question": "What if my funds are frozen by court order?", "answer": "We comply with legal orders. Rare. But possible.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0031", "category": "support", "question": "Do you support REST API for trading?", "answer": "Yes, full REST API. Authentication required. Want docs?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0032", "category": "general", "question": "Can I get historical trade data via API?", "answer": "Yes, last 2 years. Paginated. Want a sample?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0033", "category": "general", "question": "Do you have rate limits for API?", "answer": "100 requests per minute standard. Higher for institutions.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0034", "category": "general", "question": "Can I get real-time balance updates via WebSocket?", "answer": "Yes, subscribe to balance channel. Instant updates.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0036", "category": "account", "question": "Can I automate KYC via API?", "answer": "No, manual for compliance. We can't automate due diligence.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0037", "category": "general", "question": "Do you have a Python library?", "answer": "Community-supported. Examples in docs. Need help?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0038", "category": "general", "question": "Can I integrate with my CRM?", "answer": "Yes, via API or Zapier. Want the webhook URL?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0040", "category": "general", "question": "Can I connect via Bloomberg terminal?", "answer": "Not yet. Exploring. Want to be notified?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0041", "category": "support", "question": "Do you support batch withdrawals via API?", "answer": "Yes, up to 100 withdrawals per batch. Efficient.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0042", "category": "general", "question": "Can I schedule recurring buys via API?", "answer": "Yes, create recurring orders. Daily, weekly, monthly.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0043", "category": "general", "question": "Do you have a sandbox environment?", "answer": "Yes, testnet with fake funds. Request access.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0044", "category": "staking", "question": "Can I test staking on testnet?", "answer": "Yes, Sepolia for ETH. Get test ETH from faucet.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0045", "category": "general", "question": "Do you have API documentation in Arabic?", "answer": "English only currently. Arabic coming. Need translation?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0046", "category": "general", "question": "Can I get notified via webhook for events?", "answer": "Yes, deposits, withdrawals, trades. Configure in dashboard.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0047", "category": "support", "question": "Do you support OAuth for API?", "answer": "API keys only. OAuth not supported.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0048", "category": "general", "question": "Can I generate API keys with restricted permissions?", "answer": "Yes, read-only, trade-only, withdraw-only. Granular.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0049", "category": "general", "question": "What is the API response time?", "answer": "<100ms for reads. <500ms for writes. Fast.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0050", "category": "general", "question": "Do you have a status page for API?", "answer": "status.alfardanq9.com. Real-time uptime.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0052", "category": "support", "question": "Do you support IP whitelisting for API?", "answer": "Yes, restrict to your servers. Extra security.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0053", "category": "general", "question": "Can I rotate API keys automatically?", "answer": "Manual rotation. We don't auto-rotate for security.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0054", "category": "general", "question": "Do you log all API requests?", "answer": "Yes, 7-year retention. Audit trail.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0055", "category": "general", "question": "Can I export my API logs?", "answer": "Yes, via support request. Want them?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0056", "category": "general", "question": "Do you have a GraphQL API?", "answer": "No, REST only. GraphQL not planned.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0057", "category": "general", "question": "Can I integrate with Excel?", "answer": "Yes, via API or manual CSV export. Want template?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0058", "category": "support", "question": "Do you support Power BI integration?", "answer": "Yes, via API. Connect your dashboard.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0059", "category": "account", "question": "Can I get a custom webhook for my accounting system?", "answer": "Yes, contact support. We'll build.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0060", "category": "general", "question": "Do you have an SDK for Java?", "answer": "Not officially. Community examples exist.\n\nREPORTING & AUDIT (61-90)", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0061", "category": "account", "question": "Can I get a statement for my accountant?", "answer": "Yes, PDF or CSV. Monthly, quarterly, custom.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0062", "category": "general", "question": "Do you provide tax reports?", "answer": "Transaction history only. Your accountant handles tax.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0063", "category": "general", "question": "Can I get a proof of funds letter?", "answer": "Yes, from compliance. For visa, school, etc.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0064", "category": "account", "question": "Do you support IFRS accounting?", "answer": "Yes, reports align with IFRS. Ask your auditor.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0065", "category": "security", "question": "Can I get a signed audit confirmation?", "answer": "Yes, directly from Deloitte. Request via support.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0066", "category": "account", "question": "Do you provide fair value accounting?", "answer": "Yes, end-of-day prices. Mark-to-market.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0067", "category": "staking", "question": "Can I get a breakdown of staking rewards by day?", "answer": "Yes, daily CSV. Every reward transaction.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0068", "category": "general", "question": "Do you report to any credit agency?", "answer": "No, private. Your borrowing stays confidential.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0069", "category": "general", "question": "Can I get a letter of credit from you?", "answer": "No, we don't issue letters of credit.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0070", "category": "general", "question": "Do you provide NAV calculations?", "answer": "For institutional clients, yes. Daily NAV.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0071", "category": "general", "question": "Can I get a performance report?", "answer": "Yes, dashboard shows ROI, APY, total returns.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0072", "category": "fees", "question": "Do you track cost basis?", "answer": "Yes, FIFO/LIFO available. Customizable.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0073", "category": "general", "question": "Can I get a realized vs unrealized P&L?", "answer": "Yes, in dashboard. Real-time.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0074", "category": "security", "question": "Do you provide audit trail for all transactions?", "answer": "Yes, immutable logs. 7-year retention.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0075", "category": "general", "question": "Can I get a statement for my custodian?", "answer": "Yes, PDF with your holdings. Share with any custodian.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0076", "category": "support", "question": "Do you support multiple currencies in reporting?", "answer": "Yes, USD, AED, EUR, BHD. Choose your base.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0077", "category": "account", "question": "Can I get a consolidated report across multiple accounts?", "answer": "Yes, for family offices. Master account view.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0078", "category": "general", "question": "Do you provide benchmark comparisons?", "answer": "Yes, vs network average. See how we perform.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0079", "category": "general", "question": "Can I get a risk report?", "answer": "Yes, LTV, concentration, volatility metrics.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0080", "category": "general", "question": "Do you provide stress test scenarios?", "answer": "On request. For large institutions. Want a simulation?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0081", "category": "staking", "question": "Can I get a report on validator performance?", "answer": "Yes, uptime, effectiveness, rewards by validator.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0082", "category": "general", "question": "Do you provide MEV breakdown?", "answer": "Yes, see MEV as separate line item. Transparent.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0083", "category": "fees", "question": "Can I get a report on gas fees paid?", "answer": "Yes, all network fees itemized.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0084", "category": "general", "question": "Do you provide a report on slashing protection?", "answer": "Yes, see fund size, coverage ratio.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0085", "category": "security", "question": "Can I get a certificate of insurance?", "answer": "Yes, under NDA. Request via RM.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0086", "category": "sharia", "question": "Do you provide a legal opinion on Sharia?", "answer": "Yes, from Sheikh Dr. Tariq. Available on request.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0087", "category": "general", "question": "Can I get a report on your reserves?", "answer": "Yes, monthly proof of reserves. Under NDA.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0088", "category": "general", "question": "Do you provide a risk disclosure statement?", "answer": "Yes, standard document. In your dashboard.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0089", "category": "security", "question": "Can I get a copy of your audited financials?", "answer": "Yes, under NDA. For qualified investors.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0090", "category": "general", "question": "Do you provide a statement of client assets?", "answer": "Yes, quarterly. Legally required.\n\nLEGAL & COMPLIANCE DETAILS (91-120)", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0091", "category": "general", "question": "What law governs your contracts?", "answer": "DIFC law. English common law. International standard.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0092", "category": "custody", "question": "Can I negotiate the custody agreement?", "answer": "For large clients, yes. Within reason.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0093", "category": "lending", "question": "Do you have a standard lending agreement?", "answer": "Yes, template available. Your lawyer can review.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0094", "category": "general", "question": "What happens if you change terms?", "answer": "30-day notice. You can withdraw without penalty.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0095", "category": "general", "question": "Do you have a complaints process?", "answer": "Yes, email complaints@. Response within 24 hours.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0096", "category": "general", "question": "Can I arbitrate disputes?", "answer": "Yes, DIFC arbitration. Faster than courts.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0097", "category": "general", "question": "Do you have a data protection officer?", "answer": "Yes, contact compliance. GDPR compliant.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0098", "category": "general", "question": "Can I request my data be deleted?", "answer": "Yes, subject to regulatory retention (5-7 years).", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0100", "category": "general", "question": "Do you have a sub-processor list?", "answer": "Yes, Fireblocks, Fuze, banks. Available on request.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0101", "category": "general", "question": "Can I get a Data Processing Agreement?", "answer": "Yes, for institutional clients. Request from compliance.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0103", "category": "general", "question": "Do you comply with Swiss data laws?", "answer": "Not specifically. DIFC law governs.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0104", "category": "compliance", "question": "Can I get a copy of your AML policy?", "answer": "Yes, for regulators. Under NDA.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0105", "category": "general", "question": "Do you screen against sanctions lists?", "answer": "Yes, real-time. OFAC, UN, EU sanctions.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0106", "category": "general", "question": "Can I be anonymous?", "answer": "No, KYC required. No anonymous accounts.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0107", "category": "general", "question": "Do you accept PEPs (Politically Exposed Persons)?", "answer": "Case by case. Enhanced due diligence.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0108", "category": "account", "question": "Can I open an account for a shell company?", "answer": "No, prohibited. Need substance.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0109", "category": "general", "question": "Do you accept trusts from certain jurisdictions?", "answer": "Yes, most common law trusts. Need legal review.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0110", "category": "account", "question": "Can I open an account for a DAO?", "answer": "Case by case. Need legal entity.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0111", "category": "general", "question": "Do you accept crypto hedge funds?", "answer": "Yes, standard institutional onboarding.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0112", "category": "account", "question": "Can I open an account for a venture fund?", "answer": "Yes, same process. Need fund docs.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0113", "category": "general", "question": "Do you accept pension funds?", "answer": "Yes, welcome. Minimum $1M.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0114", "category": "account", "question": "Can I open an account for an endowment?", "answer": "Yes, universities, foundations welcome.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0115", "category": "general", "question": "Do you accept sovereign wealth funds?", "answer": "Yes, we serve several. Confidential.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0116", "category": "account", "question": "Can I open an account for a charity?", "answer": "Yes, with proper documentation.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0117", "category": "general", "question": "Do you have a minimum for non-profits?", "answer": "$100k standard. Exceptions possible.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0118", "category": "account", "question": "Can I open an account for a religious organization?", "answer": "Yes, with Sharia compliance already covered.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0119", "category": "account", "question": "Do you accept accounts from sanctioned countries?", "answer": "No, prohibited by law.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0120", "category": "account", "question": "Can I open an account if I live in a restricted state?", "answer": "Check with compliance. Case by case.\n\nPRODUCT ROADMAP (121-150)", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0122", "category": "staking", "question": "When will you support restaking (EigenLayer)?", "answer": "Q4 2026. Research phase. Want to beta test?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0123", "category": "lending", "question": "Are you adding more lending assets?", "answer": "Yes, SOL lending coming. Also stablecoins.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0124", "category": "general", "question": "Will you offer credit cards?", "answer": "Not planned. Focus on institutional.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0125", "category": "general", "question": "Are you building a mobile app?", "answer": "Yes, Q3 2026. iOS and Android.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0126", "category": "general", "question": "Will you have a debit card?", "answer": "Maybe in 2027. Not priority.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0127", "category": "general", "question": "Are you adding fiat on-ramp via cards?", "answer": "No, wire only. Institutional focus.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0128", "category": "support", "question": "Will you support more fiat currencies?", "answer": "CHF, GBP planned. Which do you need?", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0129", "category": "general", "question": "Are you adding options trading?", "answer": "OTC options by request. Exchange options later.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0130", "category": "general", "question": "Will you have a copy trading feature?", "answer": "No, institutional focus. Not retail.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0131", "category": "general", "question": "Are you adding social trading?", "answer": "No, not appropriate for family offices.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0132", "category": "account", "question": "Will you have a demo account?", "answer": "Yes, testnet available. Request access.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0133", "category": "general", "question": "Are you building a learning center?", "answer": "Yes, institutional insights section. Growing.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0134", "category": "general", "question": "Will you host webinars?", "answer": "Yes, quarterly for clients. You're invited.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0135", "category": "general", "question": "Are you adding more languages to the platform?", "answer": "Arabic full. Chinese, French, Spanish planned.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0136", "category": "general", "question": "Will you have a referral program?", "answer": "Yes, for institutions. Contact RM.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0137", "category": "general", "question": "Are you adding a bug bounty program?", "answer": "Yes, already live. Submit via security@.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0138", "category": "general", "question": "Will you have a developer grant program?", "answer": "Not currently. Maybe future.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0139", "category": "general", "question": "Are you building a venture arm?", "answer": "No, we focus on custody and execution.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0140", "category": "general", "question": "Will you launch a token?", "answer": "No, not planned. We're not a DeFi project.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0142", "category": "general", "question": "Will you acquire other companies?", "answer": "Possibly. Nothing announced.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0143", "category": "general", "question": "Are you expanding to other GCC countries?", "answer": "Already serve all GCC. No new offices planned.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0144", "category": "general", "question": "Will you open in Saudi Arabia?", "answer": "We serve Saudi clients. Office? Not yet.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0145", "category": "compliance", "question": "Are you getting a Saudi license?", "answer": "Exploring. No timeline.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0146", "category": "general", "question": "Will you open in Qatar?", "answer": "Serve Qatari clients. License? Not yet.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0148", "category": "general", "question": "Will you open in Europe?", "answer": "Service center in London. No license there.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0149", "category": "compliance", "question": "Are you getting a European license?", "answer": "Not planned. Focus on GCC.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0150", "category": "general", "question": "Will you open in the US?", "answer": "No, regulatory complexity. Serve US persons? Limited.\n\nCOSTS & SAVINGS (151-180)", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0151", "category": "general", "question": "How much can I save switching from Coinbase?", "answer": "On $1M staked: ~$10k/year in fees. Plus better rates.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0152", "category": "general", "question": "How much can I save switching from Binance?", "answer": "Lower spreads on OTC. On $10M trade: $5k savings.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0153", "category": "general", "question": "How much can I save switching from Ledn?", "answer": "Higher LTV means more borrowing power. On 1 BTC: $17.5k more.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0154", "category": "general", "question": "How much can I save switching from Nexo?", "answer": "Lower interest rates. On $1M loan: $20k/year savings.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0155", "category": "general", "question": "What is the break-even on switching?", "answer": "Immediate. No exit fees. Start saving day one.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0156", "category": "general", "question": "Do you offer volume discounts?", "answer": "Yes, tiered pricing. Larger portfolios pay less.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0157", "category": "fees", "question": "Can I get a custom fee schedule?", "answer": "For $10M+ AUM, yes. Negotiable.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0158", "category": "general", "question": "Do you have a loyalty program?", "answer": "Better rates for long-term clients. Grandfathered.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0159", "category": "fees", "question": "Are fees negotiable for large families?", "answer": "Yes, contact your RM. We're flexible.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0160", "category": "fees", "question": "Do you offer fee-free first year?", "answer": "No, but competitive from day one.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0161", "category": "fees", "question": "Can I earn fee rebates?", "answer": "Not currently. We keep fees low instead.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0162", "category": "account", "question": "Do you charge for account closure?", "answer": "No, free. Your assets, your choice.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0163", "category": "general", "question": "Do you charge for statements?", "answer": "No, unlimited free exports.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0164", "category": "support", "question": "Do you charge for support?", "answer": "No, included. 24/7.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0165", "category": "general", "question": "Do you charge for RM?", "answer": "No, included for all institutional clients.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0166", "category": "general", "question": "Do you charge for API access?", "answer": "No, free for institutional tier.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0167", "category": "general", "question": "Do you charge for testnet?", "answer": "No, free for development.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0168", "category": "general", "question": "Do you charge for proof of reserves?", "answer": "No, free under NDA.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0169", "category": "general", "question": "Do you charge for legal opinions?", "answer": "For large clients, included. Otherwise fee.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0170", "category": "account", "question": "Do you charge for expedited KYC?", "answer": "No, standard process is fast.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0171", "category": "general", "question": "Do you charge for wire transfers?", "answer": "No from us. Your bank may charge.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0172", "category": "general", "question": "Do you charge for failed transactions?", "answer": "No, network fees only if broadcast.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0173", "category": "account", "question": "Do you charge for dormant accounts?", "answer": "No, never.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0174", "category": "account", "question": "Do you charge for account recovery?", "answer": "No, support helps free.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0175", "category": "account", "question": "Do you charge for 2FA reset?", "answer": "No, security process but free.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0176", "category": "general", "question": "Do you charge for whitelist changes?", "answer": "No, free. Takes 24 hours.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0177", "category": "general", "question": "Do you charge for adding signers?", "answer": "No, free. Configure in dashboard.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0178", "category": "custody", "question": "Do you charge for wallet creation?", "answer": "No, unlimited free wallets.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0179", "category": "general", "question": "Do you charge for address generation?", "answer": "No, free. New address each deposit.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0180", "category": "general", "question": "Do you charge for transaction history?", "answer": "No, unlimited exports.\n\nFINAL COMPARISON & DECISION (181-200)", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0181", "category": "general", "question": "Why should I switch today?", "answer": "Lower fees, better rates, more security. Start saving now.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0182", "category": "general", "question": "What's the risk of staying with my current provider?", "answer": "Higher fees, less insurance, weaker regulation. Risky.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0183", "category": "general", "question": "How do I know you'll be here in 10 years?", "answer": "50+ years already. Family-owned. We're not going anywhere.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0184", "category": "general", "question": "Can I try before committing?", "answer": "Yes, testnet. Also small deposit to test.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0185", "category": "general", "question": "What's the minimum to test?", "answer": "$3k Starter program. Test with real funds.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0186", "category": "general", "question": "Can I start small and grow?", "answer": "Yes, Starter ($3k) to Institutional ($100k) to Sovereign ($25M+).", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0187", "category": "general", "question": "Do you have references?", "answer": "Yes, for qualified investors. Contact RM.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0188", "category": "general", "question": "Can I speak to other clients?", "answer": "With their permission. Confidential.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0189", "category": "general", "question": "Do you have case studies?", "answer": "Yes, anonymized. Available on request.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0190", "category": "account", "question": "What's the onboarding process?", "answer": "Sign up → KYC → Fund → Start. Takes 24-48 hours.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0191", "category": "general", "question": "Can I onboard today?", "answer": "Yes, start now. Link in chat.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0192", "category": "general", "question": "What's the first step?", "answer": "Click 'Sign Up'. Takes 5 minutes.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0193", "category": "staking", "question": "How long until I can stake?", "answer": "After KYC approved. 24-48 hours.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0194", "category": "lending", "question": "How long until I can borrow?", "answer": "After KYC + collateral deposit. 48-72 hours.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0195", "category": "otc", "question": "How long until I can trade OTC?", "answer": "After KYC. Instant quote. 30 minutes execution.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0196", "category": "general", "question": "What's the best way to start?", "answer": "Deposit $100k. Stake ETH. Earn daily. Simple.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0197", "category": "general", "question": "What if I change my mind?", "answer": "Withdraw anytime. No penalty. No questions.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0198", "category": "general", "question": "What's your cancellation policy?", "answer": "No contract. Month to month. Leave anytime.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0199", "category": "general", "question": "What's your refund policy?", "answer": "Fees are for services rendered. No refunds on past fees.", "source": "200-additional-q-a"}
+{"id": "200-additional-q-a-0200", "category": "general", "question": "What's the final reason to choose Al Fardan Q9?", "answer": "Because your wealth deserves the best: security, rates, service, heritage. We deliver all four.", "source": "200-additional-q-a"}

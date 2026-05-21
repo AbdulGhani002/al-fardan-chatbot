@@ -90,20 +90,24 @@ class Settings(BaseSettings):
     # Per-request LLM timeout (seconds). CPU-hosted 7B models finish
     # 320 tokens in 20-35 s; give enough buffer that a slow request
     # doesn't trigger a retry storm, but not so much that a dead
-    # backend blocks /chat.
-    rag_timeout_s: float = 40.0
+    # backend blocks /chat. Lowered 40 → 18 (May 21 — perf): with
+    # the high-confidence skip path doing the heavy lifting, RAG
+    # only runs on long-tail queries. 18s is plenty for hosted
+    # backends (Genspark/OpenAI) and forces a fast fall-back to
+    # the KB answer when self-hosted Ollama is being slow.
+    rag_timeout_s: float = 18.0
 
     # RAG activation policy — when the top retrieval score is ABOVE
     # `rag_high_confidence_threshold` we return the KB answer as-is
     # (fast path, no LLM hit). Below it (but still >= confidence_
     # threshold) we run RAG. This keeps costs + latency low for
     # exact-match queries while letting the LLM handle the long tail.
-    # Raised 0.55 → 0.80 after observing the 3B model occasionally
-    # rewriting high-score hits in the wrong language or claiming
-    # the reference "doesn't cover" the question. For very-high-
-    # confidence matches (80%+) we want the exact KB answer, not a
-    # lossy paraphrase.
-    rag_high_confidence_threshold: float = 0.80
+    # Lowered 0.80 → 0.55 (May 21 — perf): with the new KB at
+    # 5,700+ curated entries we hit clean top-1 matches much more
+    # often, and the prior 0.80 threshold almost never fired so
+    # RAG was running on every query. 0.55 is the band where the
+    # top-1 question is clearly the right answer.
+    rag_high_confidence_threshold: float = 0.55
 
     # ─── Voice (Twilio phone agent) ──────────────────────────────
     # Auth token from the Twilio console — used to HMAC-verify

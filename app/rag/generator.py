@@ -182,9 +182,19 @@ class OpenAICompatibleGenerator(Generator):
 
         payload = {
             "model": self.model,
+            # Low temperature — we want the LLM to STAY ON-CONTEXT
+            # with the KB references, not "be creative". 0.3 is the
+            # sweet spot between deterministic-rephrasing and
+            # natural-sounding output.
             "temperature": 0.3,
             "top_p": 0.9,
-            "max_tokens": 512,
+            # Capped at 400 (May 21 — perf): chat answers are
+            # rarely useful past 350 tokens and the extra ceiling
+            # only buys us slower responses for ~no quality gain.
+            # The KB answers themselves average ~120 tokens; we
+            # give 3× headroom so the LLM can blend two references
+            # cleanly when needed.
+            "max_tokens": 400,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},

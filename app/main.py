@@ -1101,8 +1101,31 @@ async def chat(
     # references. Retains the KB answer as a safety net — if the
     # LLM call fails, times out, or produces an empty string we fall
     # straight back to `humanized` and the user sees no difference.
+    #
+    # High-confidence short-circuit (May 21 — perf): when the top
+    # match score is at or above settings.rag_high_confidence_threshold
+    # we ship the KB answer directly without paying the LLM round-
+    # trip. The KB answers are already curated, on-brand, and
+    # complete; rewriting them adds 8-30s of latency for a marginal
+    # phrasing improvement. RAG still runs on the long tail where
+    # scores are 0.15-0.80 and the LLM's synthesis adds real value.
     match_type_used = "kb_hit"
-    if _generator_ready and _generator is not None:
+    rag_eligible = (
+        _generator_ready
+        and _generator is not None
+        and top.score < settings.rag_high_confidence_threshold
+    )
+    if (
+        _generator_ready
+        and _generator is not None
+        and top.score >= settings.rag_high_confidence_threshold
+    ):
+        print(
+            f"[rag] high-confidence skip — top={top.entry.id} "
+            f"score={top.score:.3f} ≥ {settings.rag_high_confidence_threshold} "
+            f"(serving KB answer directly)"
+        )
+    if rag_eligible:
         refs = [
             {
                 "id": h.entry.id,
