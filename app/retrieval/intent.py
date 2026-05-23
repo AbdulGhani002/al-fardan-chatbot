@@ -213,13 +213,32 @@ _START_WITHDRAW_RE = re.compile(
     re.I,
 )
 _START_DEPOSIT_RE = re.compile(
-    r"\b(deposit|fund\s+my\s+account|top\s+up|add\s+crypto|"
+    # James (May 22) QA: bare "deposit" was hijacking KB lookups
+    # like "is my deposit insured" and "what's the minimum custody
+    # deposit for SOL" — both contain "deposit" as a noun and got
+    # routed to the generic deposit walkthrough instead of the
+    # insurance / per-asset-minimum KB entry. Tightened the
+    # alternation so the noun-form "deposit" only fires the intent
+    # when it's paired with a verb / target ("make a deposit",
+    # "deposit funds", "deposit BTC to my account") rather than
+    # any mention of the word.
+    r"\b("
+    # Verb phrases that are unambiguously about depositing
+    r"(make|do|start|process|initiate|create|submit|placing|placed)\s+(an?\s+|the\s+|my\s+)?deposit|"
+    # "deposit X" where X is a crypto / funds verb-target
+    r"deposit\s+(funds?|money|crypto|btc|eth|sol|usdt|usdc|coins?|tokens?|assets?)|"
+    r"deposit\s+(to|into|in|at)\s+(my\s+|the\s+|al[- ]?fardan|q9|custody|wallet)|"
+    # Existing alternatives, kept
+    r"fund\s+my\s+account|top\s+up|add\s+crypto|"
     # Scoped "send ... to you" only when the user is clearly talking
     # about crypto/funds — not "send you my passport" (James QA).
     r"send\s+(crypto|btc|eth|sol|usdt|usdc|funds|assets?|coins?|tokens?)\s+to\s+you|"
-    r"how\s+(do|to)\s+deposit|"
+    r"how\s+(do|to|can\s+i)\s+deposit|"
     r"deposit\s+address|"
-    r"where\s+to\s+send\s+(my\s+|the\s+)?(crypto|btc|eth|sol|funds|usdt|usdc|coins?|tokens?|assets?))\b",
+    r"where\s+to\s+send\s+(my\s+|the\s+)?(crypto|btc|eth|sol|funds|usdt|usdc|coins?|tokens?|assets?)|"
+    r"i\s+(want|need|wanting|trying|would\s+like)\s+to\s+deposit|"
+    r"can\s+i\s+deposit"
+    r")\b",
     re.I,
 )
 _GOTO_CUSTODY_RE = re.compile(
